@@ -49,3 +49,6 @@ app.*.map.json
 
 # Firebase service account (credenciales privadas)
 serviceAccount.json
+
+# Node
+node_modules/
