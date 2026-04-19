@@ -5,8 +5,8 @@ class VersionService {
   static Future<bool> isUpdateRequired() async {
     try {
       final doc = await FirebaseFirestore.instance
-          .collection('configuracion')
-          .doc('version')
+          .collection('ajustes')
+          .doc('configuracion')
           .get();
 
       if (!doc.exists) return false;
