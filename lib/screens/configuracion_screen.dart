@@ -1,9 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../services/stock_service.dart';
 
-class ConfiguracionSistemaScreen extends StatelessWidget {
+class ConfiguracionSistemaScreen extends StatefulWidget {
   const ConfiguracionSistemaScreen({super.key});
+
+  @override
+  State<ConfiguracionSistemaScreen> createState() => _ConfiguracionSistemaScreenState();
+}
+
+class _ConfiguracionSistemaScreenState extends State<ConfiguracionSistemaScreen> {
+  String _version = '';
+
+  @override
+  void initState() {
+    super.initState();
+    PackageInfo.fromPlatform().then((info) {
+      setState(() => _version = 'v${info.version}');
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,18 +33,31 @@ class ConfiguracionSistemaScreen extends StatelessWidget {
           }
           bool stockForzado =
               snap.data!.exists ? (snap.data!['stock_forzado'] ?? false) : false;
-          return ListView(
-            padding: const EdgeInsets.all(20),
+          return Column(
             children: [
-              Card(
-                child: SwitchListTile(
-                  title: const Text("ABRIR STOCK MANUALMENTE",
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle:
-                      const Text("Permite realizar stock fuera del domingo."),
-                  activeColor: Colors.cyan,
-                  value: stockForzado,
-                  onChanged: (val) => StockService.setStockForzado(val),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.all(20),
+                  children: [
+                    Card(
+                      child: SwitchListTile(
+                        title: const Text("ABRIR STOCK MANUALMENTE",
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle:
+                            const Text("Permite realizar stock fuera del domingo."),
+                        activeThumbColor: Colors.cyan,
+                        value: stockForzado,
+                        onChanged: (val) => StockService.setStockForzado(val),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Text(
+                  _version,
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
                 ),
               ),
             ],

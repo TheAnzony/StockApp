@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../session.dart';
 import '../services/stock_service.dart';
 import 'menu_principal.dart';
@@ -11,6 +12,16 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  String _version = '';
+
+  @override
+  void initState() {
+    super.initState();
+    PackageInfo.fromPlatform().then((info) {
+      setState(() => _version = 'v${info.version}');
+    });
+  }
+
   int _obtenerPrioridad(String rol) {
     switch (rol.toLowerCase()) {
       case 'admin':
@@ -189,6 +200,13 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     );
                   },
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Text(
+                  _version,
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
                 ),
               ),
             ],
