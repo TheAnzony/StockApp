@@ -46,3 +46,6 @@ app.*.map.json
 
 # Claude Code memory
 .claude/
+
+# Firebase service account (credenciales privadas)
+serviceAccount.json
