@@ -1,0 +1,148 @@
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../session.dart';
+import '../services/stock_service.dart';
+import 'login_screen.dart';
+import 'inventario_screen.dart';
+import 'recibidos_screen.dart';
+import 'roturas_screen.dart';
+import 'prestado_screen.dart';
+import 'historial_seleccion_screen.dart';
+import 'gestion_catalogo_screen.dart';
+import 'gestion_personal_screen.dart';
+import 'configuracion_screen.dart';
+
+class MenuPrincipal extends StatelessWidget {
+  const MenuPrincipal({super.key});
+
+  Future<bool?> _dialogoCerrarSesion(BuildContext context) {
+    return showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Cerrar Sesión'),
+        content: const Text('¿Seguro que quieres cerrar la sesión?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text('NO')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('SÍ, SALIR'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final String rol = usuarioActual?['rol'] ?? 'trabajador';
+    final bool isAdmin = rol == 'admin';
+    final bool esEncargado = rol == 'encargado';
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final salir = await _dialogoCerrarSesion(context);
+        if (salir == true && context.mounted) {
+          Navigator.pushReplacement(context,
+              MaterialPageRoute(builder: (_) => const LoginScreen()));
+        }
+      },
+      child: StreamBuilder<DocumentSnapshot>(
+        stream: StockService.configuracionStream(),
+        builder: (context, snapConfig) {
+          bool stockForzado = false;
+          if (snapConfig.hasData && snapConfig.data!.exists) {
+            stockForzado = snapConfig.data!['stock_forzado'] ?? false;
+          }
+          final bool puedeHacerStock = esHorarioOficial() || stockForzado;
+
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text('PANEL DE CONTROL'),
+              actions: [
+                if (isAdmin)
+                  IconButton(
+                    icon: const Icon(Icons.settings, color: Colors.blueGrey),
+                    onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) =>
+                                const ConfiguracionSistemaScreen())),
+                  ),
+                IconButton(
+                    icon: const Icon(Icons.logout, color: Colors.redAccent),
+                    onPressed: () async {
+                      final salir = await _dialogoCerrarSesion(context);
+                      if (salir == true && context.mounted) {
+                        Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const LoginScreen()));
+                      }
+                    }),
+              ],
+            ),
+            body: Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: GridView.count(
+                crossAxisCount: 2,
+                crossAxisSpacing: 15,
+                mainAxisSpacing: 15,
+                children: [
+                  _btn(context, 'VER STOCK', Icons.inventory, Colors.blue,
+                      const InventarioScreen(modoEdicion: false)),
+                  if (puedeHacerStock && (isAdmin || esEncargado))
+                    _btn(context, 'REALIZAR STOCK', Icons.fact_check,
+                        Colors.cyan, const InventarioScreen(modoEdicion: true)),
+                  _btn(context, 'RECIBIDO', Icons.download, Colors.green,
+                      const RecibidosScreen()),
+                  _btn(context, 'ROTURAS', Icons.report_problem, Colors.red,
+                      const RoturasScreen()),
+                  _btn(context, 'PRESTADO', Icons.swap_horiz, Colors.orange,
+                      const PrestadoScreen()),
+                  if (isAdmin || esEncargado)
+                    _btn(context, 'HISTORIALES', Icons.assignment,
+                        Colors.purple, const SeleccionHistorialScreen()),
+                  if (isAdmin) ...[
+                    _btn(context, 'CATÁLOGO', Icons.shopping_cart, Colors.amber,
+                        const GestionCatalogoScreen()),
+                    _btn(context, 'GESTIÓN STAFF', Icons.admin_panel_settings,
+                        Colors.teal, const GestionPersonalScreen()),
+                  ],
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _btn(
+          BuildContext context, String titulo, IconData icono, Color color, Widget destino) =>
+      InkWell(
+        onTap: () => Navigator.push(
+            context, MaterialPageRoute(builder: (_) => destino)),
+        child: Container(
+          decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: color, width: 2)),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icono, size: 40, color: color),
+              const SizedBox(height: 10),
+              Text(titulo,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 13)),
+            ],
+          ),
+        ),
+      );
+}

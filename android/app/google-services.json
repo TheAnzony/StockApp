@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "1016052971435",
+    "project_id": "stock-cachimbas",
+    "storage_bucket": "stock-cachimbas.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1016052971435:android:409bd19c60baba378504ee",
+        "android_client_info": {
+          "package_name": "com.example.flutter_application_1"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBDxBV_X9VDtBMfgCm-l-z7NxtHw24_0jE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1016052971435:android:2ade449e1f79598e8504ee",
+        "android_client_info": {
+          "package_name": "com.example.proyecto_stockapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBDxBV_X9VDtBMfgCm-l-z7NxtHw24_0jE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
