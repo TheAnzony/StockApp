@@ -175,7 +175,10 @@ class _LoginScreenState extends State<LoginScreen> {
           return Column(
             children: [
               const SizedBox(height: 100),
-              const Icon(Icons.nightlife, size: 80, color: Colors.blueAccent),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Image.asset('assets/icons/StockApp_icon.png', width: 80, height: 80),
+              ),
               const SizedBox(height: 20),
               const Text('CONTROL DE ACCESO',
                   style:
@@ -187,15 +190,21 @@ class _LoginScreenState extends State<LoginScreen> {
                   itemCount: usuarios.length,
                   itemBuilder: (context, index) {
                     var user = usuarios[index];
+                    final rol = user['rol'].toString().toLowerCase();
+                    final color = rol == 'admin'
+                        ? Colors.red
+                        : rol == 'encargado'
+                            ? Colors.yellow
+                            : Colors.cyan;
                     return Card(
                       margin: const EdgeInsets.only(bottom: 15),
                       child: ListTile(
-                        leading:
-                            const Icon(Icons.person, color: Colors.blueGrey),
+                        leading: Icon(Icons.person, color: color),
                         title: Text(user['nombre'],
                             style: const TextStyle(
                                 fontWeight: FontWeight.bold)),
-                        subtitle: Text(user['rol'].toString().toUpperCase()),
+                        subtitle: Text(user['rol'].toString().toUpperCase(),
+                            style: TextStyle(color: color)),
                         onTap: () => _mostrarTeclado(context, user),
                       ),
                     );
