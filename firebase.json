@@ -1,1 +1,26 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"stock-cachimbas","appId":"1:1016052971435:android:409bd19c60baba378504ee","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"stock-cachimbas","configurations":{"android":"1:1016052971435:android:409bd19c60baba378504ee","web":"1:1016052971435:web:b2afe735f662f01a8504ee"}}}}}}
+{
+  "hosting": {
+    "public": "build/web",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"]
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "stock-cachimbas",
+          "appId": "1:1016052971435:android:409bd19c60baba378504ee",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "stock-cachimbas",
+          "configurations": {
+            "android": "1:1016052971435:android:409bd19c60baba378504ee",
+            "web": "1:1016052971435:web:b2afe735f662f01a8504ee"
+          }
+        }
+      }
+    }
+  }
+}

@@ -35,61 +35,73 @@ class GestionCatalogoScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('CATÁLOGO')),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: () => _dialogo(context),
-          label: const Text('AÑADIR'),
-          icon: const Icon(Icons.add),
-          backgroundColor: Colors.amber,
-        ),
-        body: StreamBuilder(
-          stream: StockService.articulosStream(),
-          builder: (context, AsyncSnapshot<QuerySnapshot> snap) {
-            if (!snap.hasData) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            final doc = snap.data!.docs.first;
-            final data = doc.data() as Map<String, dynamic>;
-            final List<String> keys = data.keys.toList()..sort();
-            return ListView.builder(
-              itemCount: keys.length,
-              itemBuilder: (context, index) {
-                final String k = keys[index];
-                return Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.label_outline,
-                        color: Colors.amber),
-                    title: Text(k.toUpperCase()),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.delete_sweep,
-                          color: Colors.redAccent),
-                      onPressed: () => showDialog(
-                        context: context,
-                        builder: (c) => AlertDialog(
-                          title: const Text("Eliminar"),
-                          content: Text("¿Borrar $k?"),
-                          actions: [
-                            TextButton(
-                                onPressed: () => Navigator.pop(c),
-                                child: const Text("NO")),
-                            ElevatedButton(
-                              onPressed: () {
-                                StockService.deleteArticulo(
-                                    doc.reference, k);
-                                Navigator.pop(c);
-                              },
-                              child: const Text("SÍ"),
-                            ),
-                          ],
-                        ),
+  Widget build(BuildContext context) {
+    final double sw = MediaQuery.of(context).size.width;
+    final bool dt = sw > 600;
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('CATÁLOGO')),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _dialogo(context),
+        label: const Text('AÑADIR'),
+        icon: const Icon(Icons.add),
+        backgroundColor: Colors.amber,
+      ),
+      body: StreamBuilder(
+        stream: StockService.articulosStream(),
+        builder: (context, AsyncSnapshot<QuerySnapshot> snap) {
+          if (!snap.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final doc = snap.data!.docs.first;
+          final data = doc.data() as Map<String, dynamic>;
+          final List<String> keys = data.keys.toList()..sort();
+
+          Widget bodyContent = ListView.builder(
+            itemCount: keys.length,
+            itemBuilder: (context, index) {
+              final String k = keys[index];
+              return Card(
+                child: ListTile(
+                  leading: const Icon(Icons.label_outline,
+                      color: Colors.amber),
+                  title: Text(k.toUpperCase()),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete_sweep,
+                        color: Colors.redAccent),
+                    onPressed: () => showDialog(
+                      context: context,
+                      builder: (c) => AlertDialog(
+                        title: const Text("Eliminar"),
+                        content: Text("¿Borrar $k?"),
+                        actions: [
+                          TextButton(
+                              onPressed: () => Navigator.pop(c),
+                              child: const Text("NO")),
+                          ElevatedButton(
+                            onPressed: () {
+                              StockService.deleteArticulo(
+                                  doc.reference, k);
+                              Navigator.pop(c);
+                            },
+                            child: const Text("SÍ"),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                );
-              },
-            );
-          },
-        ),
-      );
+                ),
+              );
+            },
+          );
+
+          return dt
+              ? Align(
+                  alignment: Alignment.topCenter,
+                  child: SizedBox(width: sw * 0.6, child: bodyContent))
+              : bodyContent;
+        },
+      ),
+    );
+  }
 }

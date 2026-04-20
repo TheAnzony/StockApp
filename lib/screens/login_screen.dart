@@ -35,17 +35,57 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  void _mostrarNotificacionError(BuildContext context) {
+    final overlay = Overlay.of(context);
+    late OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (_) => Positioned(
+        top: MediaQuery.of(context).padding.top + 16,
+        left: 20,
+        right: 20,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.red.shade700,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.lock, color: Colors.white, size: 18),
+                SizedBox(width: 8),
+                Text('PIN INCORRECTO',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    overlay.insert(entry);
+    Future.delayed(const Duration(milliseconds: 1500), entry.remove);
+  }
+
   void _mostrarTeclado(BuildContext context, DocumentSnapshot doc) {
     String pinIntroducido = "";
+
+    final bool esEscritorio = MediaQuery.of(context).size.width > 600;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: const Color(0xFF1A1A1A),
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
-      builder: (context) {
+      builder: (modalContext) {
         return StatefulBuilder(
-          builder: (context, setModalState) {
+          builder: (modalContext, setModalState) {
             void agregarNum(String n) =>
                 setModalState(() => pinIntroducido += n);
             void borrarUno() => setModalState(() {
@@ -54,79 +94,91 @@ class _LoginScreenState extends State<LoginScreen> {
                         pinIntroducido.substring(0, pinIntroducido.length - 1);
                   }
                 });
-            return Container(
-              padding: const EdgeInsets.all(20),
-              height: MediaQuery.of(context).size.height * 0.85,
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    const SizedBox(height: 10),
-                    Text(doc['nombre'].toString().toUpperCase(),
+            void mostrarError() {
+              setModalState(() => pinIntroducido = "");
+              _mostrarNotificacionError(context);
+            }
+
+            Widget teclado = Container(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(doc['nombre'].toString().toUpperCase(),
+                      style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blueAccent)),
+                  const SizedBox(height: 12),
+                  Container(
+                    height: 58,
+                    width: double.infinity,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                        color: Colors.black,
+                        borderRadius: BorderRadius.circular(16)),
+                    child: Text(
+                        pinIntroducido.isEmpty
+                            ? "----"
+                            : "*" * pinIntroducido.length,
                         style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blueAccent)),
-                    const SizedBox(height: 20),
-                    Container(
-                      height: 70,
-                      width: double.infinity,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                          color: Colors.black,
-                          borderRadius: BorderRadius.circular(20)),
-                      child: Text(
-                          pinIntroducido.isEmpty
-                              ? "----"
-                              : "*" * pinIntroducido.length,
-                          style: const TextStyle(
-                              fontSize: 45,
-                              letterSpacing: 10,
-                              color: Colors.white)),
-                    ),
-                    const SizedBox(height: 30),
-                    GridView.count(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      crossAxisCount: 3,
-                      mainAxisSpacing: 15,
-                      crossAxisSpacing: 15,
-                      childAspectRatio: 1.4,
-                      children: [
-                        for (var i = 1; i <= 9; i++)
-                          _btnN(i.toString(), () => agregarNum(i.toString())),
-                        _btnI(Icons.close, Colors.red,
-                            () => Navigator.pop(context)),
-                        _btnN("0", () => agregarNum("0")),
-                        _btnI(Icons.backspace, Colors.orange, borrarUno),
-                        _btnN("C",
-                            () => setModalState(() => pinIntroducido = ""),
-                            color: Colors.blueGrey),
-                        const SizedBox.shrink(),
-                        _btnI(Icons.check_circle, Colors.green, () {
-                          if (pinIntroducido == doc['pin'].toString()) {
-                            usuarioActual = {
-                              'nombre': doc['nombre'],
-                              'rol': doc['rol'],
-                              'id': doc.id,
-                            };
-                            Navigator.pop(context);
-                            Navigator.pushReplacement(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (_) => const MenuPrincipal()));
-                          } else {
-                            setModalState(() => pinIntroducido = "");
-                            ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text('❌ PIN INCORRECTO'),
-                                    backgroundColor: Colors.red));
-                          }
-                        }),
-                      ],
-                    ),
-                  ],
-                ),
+                            fontSize: 38,
+                            letterSpacing: 10,
+                            color: Colors.white)),
+                  ),
+                  const SizedBox(height: 14),
+                  GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: 3,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    childAspectRatio: 1.6,
+                    children: [
+                      for (var i = 1; i <= 9; i++)
+                        _btnN(i.toString(), () => agregarNum(i.toString())),
+                      _btnI(Icons.close, Colors.red,
+                          () => Navigator.pop(modalContext)),
+                      _btnN("0", () => agregarNum("0")),
+                      _btnI(Icons.backspace, Colors.orange, borrarUno),
+                      _btnN("C",
+                          () => setModalState(() => pinIntroducido = ""),
+                          color: Colors.blueGrey),
+                      const SizedBox.shrink(),
+                      _btnI(Icons.check_circle, Colors.green, () {
+                        if (pinIntroducido == doc['pin'].toString()) {
+                          usuarioActual = {
+                            'nombre': doc['nombre'],
+                            'rol': doc['rol'],
+                            'id': doc.id,
+                          };
+                          Navigator.pop(modalContext);
+                          Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const MenuPrincipal()));
+                        } else {
+                          mostrarError();
+                        }
+                      }),
+                    ],
+                  ),
+                ],
               ),
+            );
+
+            if (!esEscritorio) return teclado;
+
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Center(
+                  child: SizedBox(
+                    width: MediaQuery.of(context).size.width * 0.45,
+                    child: teclado,
+                  ),
+                ),
+              ],
             );
           },
         );
@@ -138,27 +190,34 @@ class _LoginScreenState extends State<LoginScreen> {
       style: ElevatedButton.styleFrom(
           backgroundColor: color ?? const Color(0xFF333333),
           shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
       onPressed: onTap,
       child: Text(t,
-          style:
-              const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)));
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)));
 
   Widget _btnI(IconData i, Color c, VoidCallback onTap) => ElevatedButton(
       style: ElevatedButton.styleFrom(
-          backgroundColor: c.withOpacity(0.15),
+          backgroundColor: c.withValues(alpha: 0.15),
           side: BorderSide(color: c),
           shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
       onPressed: onTap,
-      child: Icon(i, color: c, size: 30));
+      child: Icon(i, color: c, size: 24));
 
   @override
   Widget build(BuildContext context) {
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final bool esEscritorio = screenWidth > 600;
+
     return Scaffold(
       body: StreamBuilder(
         stream: StockService.trabajadoresStream(activo: true),
         builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
+          if (snapshot.hasError) {
+            return const Center(
+                child: Text('Error al conectar',
+                    style: TextStyle(color: Colors.red)));
+          }
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
@@ -172,21 +231,26 @@ class _LoginScreenState extends State<LoginScreen> {
                 .toLowerCase()
                 .compareTo(b['nombre'].toString().toLowerCase());
           });
-          return Column(
+
+          Widget content = Column(
             children: [
-              const SizedBox(height: 100),
+              SizedBox(height: esEscritorio ? 60 : 100),
               ClipRRect(
                 borderRadius: BorderRadius.circular(20),
-                child: Image.asset('assets/icons/StockApp_icon.png', width: 80, height: 80),
+                child: Image.asset('assets/icons/StockApp_icon.png',
+                    width: esEscritorio ? 60 : 80,
+                    height: esEscritorio ? 60 : 80),
               ),
-              const SizedBox(height: 20),
-              const Text('CONTROL DE ACCESO',
-                  style:
-                      TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 40),
+              SizedBox(height: esEscritorio ? 12 : 20),
+              Text('CONTROL DE ACCESO',
+                  style: TextStyle(
+                      fontSize: esEscritorio ? 18 : 22,
+                      fontWeight: FontWeight.bold)),
+              SizedBox(height: esEscritorio ? 24 : 40),
               Expanded(
                 child: ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 30),
+                  padding: EdgeInsets.symmetric(
+                      horizontal: esEscritorio ? 0 : 30),
                   itemCount: usuarios.length,
                   itemBuilder: (context, index) {
                     var user = usuarios[index];
@@ -219,6 +283,15 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
             ],
+          );
+
+          if (!esEscritorio) return content;
+
+          return Center(
+            child: SizedBox(
+              width: screenWidth * 0.6,
+              child: content,
+            ),
           );
         },
       ),

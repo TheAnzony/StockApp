@@ -58,104 +58,112 @@ class _RoturasScreenState extends State<RoturasScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final double sw = MediaQuery.of(context).size.width;
+    final bool dt = sw > 600;
+
+    Widget bodyContent = Column(children: [
+      Expanded(
+        child: ListView.builder(
+          itemCount: items.length,
+          itemBuilder: (context, index) {
+            final String item = items[index];
+            final bool isSel = seleccionados[item]!;
+            return Card(
+              margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+              color: isSel ? Colors.red.withValues(alpha: 0.1) : null,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+                side: BorderSide(
+                    color: isSel ? Colors.red : Colors.transparent),
+              ),
+              child: InkWell(
+                onTap: isSel
+                    ? null
+                    : () => setState(() {
+                          seleccionados[item] = true;
+                          cantidades[item] = 1;
+                        }),
+                child: Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Row(children: [
+                    Checkbox(
+                      activeColor: Colors.red,
+                      value: isSel,
+                      onChanged: (v) =>
+                          setState(() => seleccionados[item] = v!),
+                    ),
+                    Expanded(
+                      child: Text(item.toUpperCase(),
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: isSel ? Colors.white : Colors.grey)),
+                    ),
+                    if (isSel) ...[
+                      IconButton(
+                        icon: const Icon(Icons.remove_circle_outline,
+                            color: Colors.red),
+                        onPressed: () => setState(() {
+                          if ((cantidades[item] ?? 1) > 1) {
+                            cantidades[item] = cantidades[item]! - 1;
+                          } else {
+                            seleccionados[item] = false;
+                          }
+                        }),
+                      ),
+                      Text("${cantidades[item]}",
+                          style: const TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold)),
+                      IconButton(
+                        icon: const Icon(Icons.add_circle_outline,
+                            color: Colors.green),
+                        onPressed: () => setState(
+                            () => cantidades[item] = (cantidades[item] ?? 0) + 1),
+                      ),
+                    ],
+                  ]),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+      Container(
+        padding: const EdgeInsets.all(20),
+        decoration: const BoxDecoration(color: Color(0xFF1E1E1E)),
+        child: Row(children: [
+          Expanded(
+            child: OutlinedButton(
+              onPressed: () => Navigator.pop(context),
+              style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, 50),
+                  side: const BorderSide(color: Colors.grey)),
+              child: const Text("CANCELAR",
+                  style: TextStyle(color: Colors.white)),
+            ),
+          ),
+          const SizedBox(width: 15),
+          Expanded(
+            child: ElevatedButton(
+              onPressed: _confirmar,
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  minimumSize: const Size(0, 50)),
+              child: const Text("CONFIRMAR",
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold, color: Colors.white)),
+            ),
+          ),
+        ]),
+      ),
+    ]);
+
     return Scaffold(
       appBar: AppBar(title: const Text("REGISTRO DE ROTURAS")),
-      body: Column(children: [
-        Expanded(
-          child: ListView.builder(
-            itemCount: items.length,
-            itemBuilder: (context, index) {
-              final String item = items[index];
-              final bool isSel = seleccionados[item]!;
-              return Card(
-                margin:
-                    const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-                color: isSel ? Colors.red.withValues(alpha: 0.1) : null,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
-                  side: BorderSide(
-                      color: isSel ? Colors.red : Colors.transparent),
-                ),
-                child: InkWell(
-                  onTap: isSel
-                      ? null
-                      : () => setState(() {
-                            seleccionados[item] = true;
-                            cantidades[item] = 1;
-                          }),
-                  child: Padding(
-                    padding: const EdgeInsets.all(10),
-                    child: Row(children: [
-                      Checkbox(
-                        activeColor: Colors.red,
-                        value: isSel,
-                        onChanged: (v) =>
-                            setState(() => seleccionados[item] = v!),
-                      ),
-                      Expanded(
-                        child: Text(item.toUpperCase(),
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: isSel ? Colors.white : Colors.grey)),
-                      ),
-                      if (isSel) ...[
-                        IconButton(
-                          icon: const Icon(Icons.remove_circle_outline,
-                              color: Colors.red),
-                          onPressed: () => setState(() {
-                            if ((cantidades[item] ?? 1) > 1) {
-                              cantidades[item] = cantidades[item]! - 1;
-                            } else {
-                              seleccionados[item] = false;
-                            }
-                          }),
-                        ),
-                        Text("${cantidades[item]}",
-                            style: const TextStyle(
-                                fontSize: 18, fontWeight: FontWeight.bold)),
-                        IconButton(
-                          icon: const Icon(Icons.add_circle_outline,
-                              color: Colors.green),
-                          onPressed: () => setState(
-                              () => cantidades[item] = (cantidades[item] ?? 0) + 1),
-                        ),
-                      ],
-                    ]),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: const BoxDecoration(color: Color(0xFF1E1E1E)),
-          child: Row(children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: () => Navigator.pop(context),
-                style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(0, 50),
-                    side: const BorderSide(color: Colors.grey)),
-                child: const Text("CANCELAR",
-                    style: TextStyle(color: Colors.white)),
-              ),
-            ),
-            const SizedBox(width: 15),
-            Expanded(
-              child: ElevatedButton(
-                onPressed: _confirmar,
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    minimumSize: const Size(0, 50)),
-                child: const Text("CONFIRMAR",
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold, color: Colors.white)),
-              ),
-            ),
-          ]),
-        ),
-      ]),
+      body: dt
+          ? Align(
+              alignment: Alignment.topCenter,
+              child: SizedBox(width: sw * 0.6, child: bodyContent))
+          : bodyContent,
     );
   }
 }

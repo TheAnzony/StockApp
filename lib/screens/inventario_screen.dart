@@ -89,6 +89,9 @@ class _InventarioScreenState extends State<InventarioScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final double sw = MediaQuery.of(context).size.width;
+    final bool dt = sw > 600;
+
     return StreamBuilder(
       stream: StockService.articulosStream(),
       builder: (context, AsyncSnapshot<QuerySnapshot> snap) {
@@ -102,105 +105,112 @@ class _InventarioScreenState extends State<InventarioScreen> {
         if (widget.modoEdicion && temp.isEmpty) {
           data.forEach((k, v) => temp[k] = (v as num).toInt());
         }
+
+        Widget bodyContent = Column(children: [
+          Expanded(
+            child: ListView(
+              children: keys.map((k) {
+                if (data[k] is! num) return const SizedBox.shrink();
+                final int val = widget.modoEdicion
+                    ? (temp[k] ?? 0)
+                    : (data[k] as num).toInt();
+                return ListTile(
+                  title: Text(k.toUpperCase(),
+                      style:
+                          const TextStyle(fontWeight: FontWeight.bold)),
+                  trailing: widget.modoEdicion
+                      ? Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                                icon: const Icon(
+                                    Icons.remove_circle_outline,
+                                    color: Colors.cyan),
+                                onPressed: () => setState(() {
+                                      if ((temp[k] ?? 0) > 0) {
+                                        temp[k] = temp[k]! - 1;
+                                      }
+                                    })),
+                            SizedBox(
+                              width: 50,
+                              child: TextFormField(
+                                key: Key('in_$k'),
+                                initialValue: '$val',
+                                keyboardType: TextInputType.number,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.cyan),
+                                decoration: const InputDecoration(
+                                    isDense: true,
+                                    border: InputBorder.none),
+                                onChanged: (v) =>
+                                    temp[k] = int.tryParse(v) ?? 0,
+                              ),
+                            ),
+                            IconButton(
+                                icon: const Icon(
+                                    Icons.add_circle_outline,
+                                    color: Colors.cyan),
+                                onPressed: () => setState(
+                                    () => temp[k] = (temp[k] ?? 0) + 1)),
+                          ],
+                        )
+                      : Text('$val',
+                          style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blueAccent)),
+                );
+              }).toList(),
+            ),
+          ),
+          if (widget.modoEdicion)
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: const BoxDecoration(
+                  color: Color(0xFF1A1A1A),
+                  border: Border(top: BorderSide(color: Colors.white10))),
+              child: Row(children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 50),
+                        side: const BorderSide(color: Colors.grey)),
+                    child: const Text("CANCELAR",
+                        style: TextStyle(color: Colors.white)),
+                  ),
+                ),
+                const SizedBox(width: 15),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () =>
+                        _confirmarGuardar(doc.reference, data),
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF00838F),
+                        minimumSize: const Size(0, 50)),
+                    child: const Text("CONFIRMAR",
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.2,
+                            color: Colors.white)),
+                  ),
+                ),
+              ]),
+            ),
+        ]);
+
         return Scaffold(
           appBar: AppBar(
               title: Text(
                   widget.modoEdicion ? 'REALIZAR STOCK' : 'VER STOCK')),
-          body: Column(children: [
-            Expanded(
-              child: ListView(
-                children: keys.map((k) {
-                  if (data[k] is! num) return const SizedBox.shrink();
-                  final int val = widget.modoEdicion
-                      ? (temp[k] ?? 0)
-                      : (data[k] as num).toInt();
-                  return ListTile(
-                    title: Text(k.toUpperCase(),
-                        style:
-                            const TextStyle(fontWeight: FontWeight.bold)),
-                    trailing: widget.modoEdicion
-                        ? Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                  icon: const Icon(
-                                      Icons.remove_circle_outline,
-                                      color: Colors.cyan),
-                                  onPressed: () => setState(() {
-                                        if ((temp[k] ?? 0) > 0) {
-                                          temp[k] = temp[k]! - 1;
-                                        }
-                                      })),
-                              SizedBox(
-                                width: 50,
-                                child: TextFormField(
-                                  key: Key('in_$k'),
-                                  initialValue: '$val',
-                                  keyboardType: TextInputType.number,
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.cyan),
-                                  decoration: const InputDecoration(
-                                      isDense: true,
-                                      border: InputBorder.none),
-                                  onChanged: (v) =>
-                                      temp[k] = int.tryParse(v) ?? 0,
-                                ),
-                              ),
-                              IconButton(
-                                  icon: const Icon(
-                                      Icons.add_circle_outline,
-                                      color: Colors.cyan),
-                                  onPressed: () => setState(
-                                      () => temp[k] = (temp[k] ?? 0) + 1)),
-                            ],
-                          )
-                        : Text('$val',
-                            style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.blueAccent)),
-                  );
-                }).toList(),
-              ),
-            ),
-            if (widget.modoEdicion)
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: const BoxDecoration(
-                    color: Color(0xFF1A1A1A),
-                    border: Border(top: BorderSide(color: Colors.white10))),
-                child: Row(children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(0, 50),
-                          side: const BorderSide(color: Colors.grey)),
-                      child: const Text("CANCELAR",
-                          style: TextStyle(color: Colors.white)),
-                    ),
-                  ),
-                  const SizedBox(width: 15),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () =>
-                          _confirmarGuardar(doc.reference, data),
-                      style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF00838F),
-                          minimumSize: const Size(0, 50)),
-                      child: const Text("CONFIRMAR",
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1.2,
-                              color: Colors.white)),
-                    ),
-                  ),
-                ]),
-              ),
-          ]),
+          body: dt
+              ? Align(
+                  alignment: Alignment.topCenter,
+                  child: SizedBox(width: sw * 0.6, child: bodyContent))
+              : bodyContent,
         );
       },
     );

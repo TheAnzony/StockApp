@@ -23,6 +23,9 @@ class _ConfiguracionSistemaScreenState extends State<ConfiguracionSistemaScreen>
 
   @override
   Widget build(BuildContext context) {
+    final double sw = MediaQuery.of(context).size.width;
+    final bool dt = sw > 600;
+
     return Scaffold(
       appBar: AppBar(title: const Text("CONFIGURACIÓN SISTEMA")),
       body: StreamBuilder<DocumentSnapshot>(
@@ -33,7 +36,8 @@ class _ConfiguracionSistemaScreenState extends State<ConfiguracionSistemaScreen>
           }
           bool stockForzado =
               snap.data!.exists ? (snap.data!['stock_forzado'] ?? false) : false;
-          return Column(
+
+          Widget bodyContent = Column(
             children: [
               Expanded(
                 child: ListView(
@@ -62,6 +66,12 @@ class _ConfiguracionSistemaScreenState extends State<ConfiguracionSistemaScreen>
               ),
             ],
           );
+
+          return dt
+              ? Align(
+                  alignment: Alignment.topCenter,
+                  child: SizedBox(width: sw * 0.6, child: bodyContent))
+              : bodyContent;
         },
       ),
     );

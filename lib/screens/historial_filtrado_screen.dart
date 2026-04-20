@@ -13,6 +13,8 @@ class HistorialFiltradoScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool isAdmin = (usuarioActual?['rol'] ?? '') == 'admin';
+    final double sw = MediaQuery.of(context).size.width;
+    final bool dt = sw > 600;
 
     return Scaffold(
       appBar: AppBar(title: Text(titulo)),
@@ -33,7 +35,7 @@ class HistorialFiltradoScreen extends StatelessWidget {
             return const Center(child: Text('Sin registros'));
           }
 
-          return ListView.builder(
+          Widget listView = ListView.builder(
             itemCount: docs.length,
             itemBuilder: (context, index) {
               final d = docs[index];
@@ -252,6 +254,11 @@ class HistorialFiltradoScreen extends StatelessWidget {
               );
             },
           );
+          return dt
+              ? Align(
+                  alignment: Alignment.topCenter,
+                  child: SizedBox(width: sw * 0.6, child: listView))
+              : listView;
         },
       ),
     );

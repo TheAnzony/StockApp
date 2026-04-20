@@ -59,6 +59,9 @@ class _PrestadoScreenState extends State<PrestadoScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final double sw = MediaQuery.of(context).size.width;
+    final bool dt = sw > 600;
+
     return Scaffold(
       appBar: AppBar(title: const Text('PRESTADO')),
       body: StreamBuilder(
@@ -76,7 +79,7 @@ class _PrestadoScreenState extends State<PrestadoScreen> {
               .toList()
             ..sort();
 
-          return Column(children: [
+          Widget bodyContent = Column(children: [
             Padding(
               padding: const EdgeInsets.all(15),
               child: TextField(
@@ -175,6 +178,12 @@ class _PrestadoScreenState extends State<PrestadoScreen> {
               ]),
             ),
           ]);
+
+          return dt
+              ? Align(
+                  alignment: Alignment.topCenter,
+                  child: SizedBox(width: sw * 0.6, child: bodyContent))
+              : bodyContent;
         },
       ),
     );

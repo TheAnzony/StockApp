@@ -90,6 +90,9 @@ class _RecibidosScreenState extends State<RecibidosScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final double sw = MediaQuery.of(context).size.width;
+    final bool dt = sw > 600;
+
     return Scaffold(
       appBar: AppBar(title: const Text("RECIBIR MATERIAL")),
       body: StreamBuilder(
@@ -101,7 +104,8 @@ class _RecibidosScreenState extends State<RecibidosScreen> {
           final catalogo =
               (snap.data!.docs.first.data() as Map).keys.whereType<String>().toList()
                 ..sort();
-          return Column(children: [
+
+          Widget bodyContent = Column(children: [
             Expanded(
               child: productosAnadidos.isEmpty
                   ? const Center(child: Text("Lista vacía"))
@@ -197,6 +201,12 @@ class _RecibidosScreenState extends State<RecibidosScreen> {
               ]),
             ),
           ]);
+
+          return dt
+              ? Align(
+                  alignment: Alignment.topCenter,
+                  child: SizedBox(width: sw * 0.6, child: bodyContent))
+              : bodyContent;
         },
       ),
     );

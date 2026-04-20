@@ -60,6 +60,41 @@ class MenuPrincipal extends StatelessWidget {
           }
           final bool puedeHacerStock = esHorarioOficial() || stockForzado;
 
+          final double screenWidth = MediaQuery.of(context).size.width;
+          final bool esEscritorio = screenWidth > 600;
+
+          final grid = Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: GridView.count(
+              crossAxisCount: 2,
+              crossAxisSpacing: 15,
+              mainAxisSpacing: 15,
+              childAspectRatio: esEscritorio ? 2.8 : 1.0,
+              children: [
+                _btn(context, 'VER STOCK', Icons.inventory, Colors.blue,
+                    const InventarioScreen(modoEdicion: false), esEscritorio: esEscritorio),
+                if (puedeHacerStock && (isAdmin || esEncargado))
+                  _btn(context, 'REALIZAR STOCK', Icons.fact_check,
+                      Colors.cyan, const InventarioScreen(modoEdicion: true), esEscritorio: esEscritorio),
+                _btn(context, 'RECIBIDO', Icons.download, Colors.green,
+                    const RecibidosScreen(), esEscritorio: esEscritorio),
+                _btn(context, 'ROTURAS', Icons.report_problem, Colors.red,
+                    const RoturasScreen(), esEscritorio: esEscritorio),
+                _btn(context, 'PRESTADO', Icons.swap_horiz, Colors.orange,
+                    const PrestadoScreen(), esEscritorio: esEscritorio),
+                if (isAdmin || esEncargado)
+                  _btn(context, 'HISTORIALES', Icons.assignment,
+                      Colors.purple, const SeleccionHistorialScreen(), esEscritorio: esEscritorio),
+                if (isAdmin) ...[
+                  _btn(context, 'CATÁLOGO', Icons.shopping_cart, Colors.amber,
+                      const GestionCatalogoScreen(), esEscritorio: esEscritorio),
+                  _btn(context, 'GESTIÓN STAFF', Icons.admin_panel_settings,
+                      Colors.teal, const GestionPersonalScreen(), esEscritorio: esEscritorio),
+                ],
+              ],
+            ),
+          );
+
           return Scaffold(
             appBar: AppBar(
               title: const Text('PANEL DE CONTROL'),
@@ -86,36 +121,14 @@ class MenuPrincipal extends StatelessWidget {
                     }),
               ],
             ),
-            body: Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: GridView.count(
-                crossAxisCount: 2,
-                crossAxisSpacing: 15,
-                mainAxisSpacing: 15,
-                children: [
-                  _btn(context, 'VER STOCK', Icons.inventory, Colors.blue,
-                      const InventarioScreen(modoEdicion: false)),
-                  if (puedeHacerStock && (isAdmin || esEncargado))
-                    _btn(context, 'REALIZAR STOCK', Icons.fact_check,
-                        Colors.cyan, const InventarioScreen(modoEdicion: true)),
-                  _btn(context, 'RECIBIDO', Icons.download, Colors.green,
-                      const RecibidosScreen()),
-                  _btn(context, 'ROTURAS', Icons.report_problem, Colors.red,
-                      const RoturasScreen()),
-                  _btn(context, 'PRESTADO', Icons.swap_horiz, Colors.orange,
-                      const PrestadoScreen()),
-                  if (isAdmin || esEncargado)
-                    _btn(context, 'HISTORIALES', Icons.assignment,
-                        Colors.purple, const SeleccionHistorialScreen()),
-                  if (isAdmin) ...[
-                    _btn(context, 'CATÁLOGO', Icons.shopping_cart, Colors.amber,
-                        const GestionCatalogoScreen()),
-                    _btn(context, 'GESTIÓN STAFF', Icons.admin_panel_settings,
-                        Colors.teal, const GestionPersonalScreen()),
-                  ],
-                ],
-              ),
-            ),
+            body: esEscritorio
+                ? Center(
+                    child: SizedBox(
+                      width: screenWidth * 0.6,
+                      child: grid,
+                    ),
+                  )
+                : grid,
           );
         },
       ),
@@ -123,7 +136,8 @@ class MenuPrincipal extends StatelessWidget {
   }
 
   Widget _btn(
-          BuildContext context, String titulo, IconData icono, Color color, Widget destino) =>
+          BuildContext context, String titulo, IconData icono, Color color, Widget destino,
+          {bool esEscritorio = false}) =>
       InkWell(
         onTap: () => Navigator.push(
             context, MaterialPageRoute(builder: (_) => destino)),
@@ -132,15 +146,16 @@ class MenuPrincipal extends StatelessWidget {
               color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: color, width: 2)),
-          child: Column(
+          child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icono, size: 40, color: color),
-              const SizedBox(height: 10),
+              Icon(icono, size: esEscritorio ? 28 : 40, color: color),
+              const SizedBox(width: 10),
               Text(titulo,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 13)),
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: esEscritorio ? 14 : 13)),
             ],
           ),
         ),

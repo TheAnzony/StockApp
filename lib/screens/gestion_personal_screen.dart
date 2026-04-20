@@ -59,22 +59,35 @@ class GestionPersonalScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) => DefaultTabController(
-        length: 2,
-        child: Scaffold(
-          appBar: AppBar(
-            title: const Text('STAFF'),
-            bottom: const TabBar(
-                tabs: [Tab(text: "ACTIVOS"), Tab(text: "INACTIVOS")]),
-          ),
-          floatingActionButton: FloatingActionButton(
-            onPressed: () => _dialogo(context),
-            child: const Icon(Icons.person_add),
-          ),
-          body: TabBarView(
-              children: [_lista(context, true), _lista(context, false)]),
+  Widget build(BuildContext context) {
+    final double sw = MediaQuery.of(context).size.width;
+    final bool dt = sw > 600;
+
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('STAFF'),
+          bottom: const TabBar(
+              tabs: [Tab(text: "ACTIVOS"), Tab(text: "INACTIVOS")]),
         ),
-      );
+        floatingActionButton: FloatingActionButton(
+          onPressed: () => _dialogo(context),
+          child: const Icon(Icons.person_add),
+        ),
+        body: dt
+            ? Align(
+                alignment: Alignment.topCenter,
+                child: SizedBox(
+                  width: sw * 0.6,
+                  child: TabBarView(
+                      children: [_lista(context, true), _lista(context, false)]),
+                ))
+            : TabBarView(
+                children: [_lista(context, true), _lista(context, false)]),
+      ),
+    );
+  }
 
   Widget _lista(BuildContext context, bool activo) => StreamBuilder(
         stream: StockService.trabajadoresStream(activo: activo),
