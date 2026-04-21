@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
+import 'firebase_options_beta.dart';
 import 'screens/login_screen.dart';
 import 'screens/update_required_screen.dart';
 import 'services/version_service.dart';
 
+const _flavor = String.fromEnvironment('FLAVOR', defaultValue: 'prod');
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  final options = _flavor == 'beta'
+      ? BetaFirebaseOptions.currentPlatform
+      : DefaultFirebaseOptions.currentPlatform;
+  await Firebase.initializeApp(options: options);
   runApp(const MyApp());
 }
 

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 APP_ID="1:1016052971435:android:2ade449e1f79598e8504ee"
-APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
+APK_PATH="build/app/outputs/flutter-apk/app-prod-release.apk"
 
 VERSION=$(grep "^version:" pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
 
@@ -10,7 +10,7 @@ read NOTES
 
 echo ""
 echo "Construyendo APK v$VERSION..."
-flutter build apk --release
+flutter build apk --release --flavor prod --dart-define=FLAVOR=prod
 
 if [ $? -ne 0 ]; then
   echo "Error al construir el APK"
