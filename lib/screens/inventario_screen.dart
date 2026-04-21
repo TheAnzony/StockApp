@@ -237,40 +237,21 @@ class _InventarioScreenState extends State<InventarioScreen> {
                   title: Text(k.toUpperCase(),
                       style: const TextStyle(fontWeight: FontWeight.bold)),
                   trailing: widget.modoEdicion
-                      ? Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                                icon: const Icon(Icons.remove_circle_outline,
-                                    color: Colors.cyan),
-                                onPressed: () => setState(() {
-                                      if ((temp[k] ?? 0) > 0) {
-                                        temp[k] = temp[k]! - 1;
-                                      }
-                                    })),
-                            SizedBox(
-                              width: 50,
-                              child: TextFormField(
-                                key: Key('in_$k'),
-                                initialValue: '$val',
-                                keyboardType: TextInputType.number,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.cyan),
-                                decoration: const InputDecoration(
-                                    isDense: true, border: InputBorder.none),
-                                onChanged: (v) =>
-                                    temp[k] = int.tryParse(v) ?? 0,
-                              ),
-                            ),
-                            IconButton(
-                                icon: const Icon(Icons.add_circle_outline,
-                                    color: Colors.cyan),
-                                onPressed: () => setState(
-                                    () => temp[k] = (temp[k] ?? 0) + 1)),
-                          ],
+                      ? SizedBox(
+                          width: 70,
+                          child: TextFormField(
+                            key: Key('in_$k'),
+                            initialValue: '$val',
+                            keyboardType: TextInputType.number,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.cyan),
+                            decoration: const InputDecoration(
+                                isDense: true, border: OutlineInputBorder()),
+                            onChanged: (v) => temp[k] = int.tryParse(v) ?? 0,
+                          ),
                         )
                       : Text('$val',
                           style: const TextStyle(

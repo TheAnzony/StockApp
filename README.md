@@ -1,12 +1,16 @@
 # Stock Disco Pro
 
-**Versión actual: 1.0.6**
+**Versión actual: 1.0.7**
 
 Aplicación móvil y web para la gestión de stock de cachimbas en una discoteca. Permite controlar el inventario en tiempo real, registrar entradas, roturas y préstamos, y consultar el historial de movimientos por categoría.
 
 ---
 
 ## Historial de versiones
+
+### v1.0.7 — Corrección de errores en realizar stock
+- Eliminados los botones + y - del conteo de stock (no funcionaban correctamente)
+- El conteo se realiza ahora exclusivamente mediante el campo de texto numérico
 
 ### v1.0.6 — Realizar stock rediseñado + documentación completa
 - Campos de conteo inician a 0: el usuario introduce solo lo que cuenta físicamente
