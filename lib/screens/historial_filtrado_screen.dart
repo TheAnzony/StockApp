@@ -51,29 +51,30 @@ class HistorialFiltradoScreen extends StatelessWidget {
                       m['motivo'] == 'RECIBIDO' || m['motivo'] == 'PRESTADO')
                   .toList();
 
-              final Map<String, dynamic> fugasMap = data['fugas'] ?? {};
-              final Map<String, int> fugasReales = {};
-              fugasMap.forEach((art, cantFuga) {
-                final String key = art.toLowerCase();
-                final int ajuste = (cantFuga as num).toInt();
-                int totalRoto = 0;
-                for (var m in totalMovs) {
-                  if (m['articulo'] == art.toUpperCase() &&
-                      m['motivo'] == 'ROTURAS') {
-                    totalRoto += (m['cantidad'] as num).toInt();
-                  }
-                }
-                if (key == 'cachimbas') {
-                  final int ajusteMastil = (fugasMap['mastil'] ?? 0).toInt();
-                  final int neto = ajuste + ajusteMastil;
-                  if (neto != 0) fugasReales[art] = neto;
-                } else if (key == 'mastil') {
-                  return;
-                } else {
-                  final int neto = ajuste - totalRoto;
-                  if (neto != 0) fugasReales[art] = neto;
-                }
-              });
+              final Map<String, dynamic> fugasRaw = data['fugas'] ?? {};
+              Map<String, int> fugasRoturas = {};
+              Map<String, int> fugasPrestados = {};
+              Map<String, int> fugasDesconocido = {};
+
+              // Formato nuevo: {roturas:{}, prestados:{}, desconocido:{}}
+              // Formato antiguo: {articulo: diferencia} → todo a desconocido
+              if (fugasRaw.containsKey('roturas') ||
+                  fugasRaw.containsKey('prestados') ||
+                  fugasRaw.containsKey('desconocido')) {
+                (fugasRaw['roturas'] as Map? ?? {}).forEach(
+                    (k, v) => fugasRoturas[k] = (v as num).toInt());
+                (fugasRaw['prestados'] as Map? ?? {}).forEach(
+                    (k, v) => fugasPrestados[k] = (v as num).toInt());
+                (fugasRaw['desconocido'] as Map? ?? {}).forEach(
+                    (k, v) => fugasDesconocido[k] = (v as num).toInt());
+              } else {
+                fugasRaw.forEach(
+                    (k, v) => fugasDesconocido[k] = (v as num).toInt());
+              }
+
+              final bool hayFugas = fugasRoturas.isNotEmpty ||
+                  fugasPrestados.isNotEmpty ||
+                  fugasDesconocido.isNotEmpty;
 
               return Card(
                 margin:
@@ -138,14 +139,13 @@ class HistorialFiltradoScreen extends StatelessWidget {
                             subtitle: Text("${m['operador']}"),
                           )),
                       const Divider(thickness: 2),
-                      if (fugasReales.isEmpty)
+                      if (!hayFugas)
                         const Padding(
                           padding: EdgeInsets.symmetric(vertical: 12.0),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.check_circle,
-                                  color: Colors.green, size: 20),
+                              Icon(Icons.check_circle, color: Colors.green, size: 20),
                               SizedBox(width: 10),
                               Text("NO HAY DESCUADRE",
                                   style: TextStyle(
@@ -163,42 +163,73 @@ class HistorialFiltradoScreen extends StatelessWidget {
                               Icon(Icons.warning_amber_rounded,
                                   color: Colors.redAccent, size: 20),
                               SizedBox(width: 10),
-                              Text("DESCUADRE",
+                              Text("DESCUADRES",
                                   style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       color: Colors.redAccent)),
                             ],
                           ),
                         ),
-                        ...fugasReales.entries.map((entry) {
-                          String? lugar;
-                          for (var mov in totalMovs) {
-                            if (mov['articulo'] ==
-                                    entry.key.toUpperCase() &&
-                                mov['motivo'] == 'PRESTADO') {
-                              lugar = mov['destino'];
-                              break;
-                            }
-                          }
-                          return ListTile(
-                            dense: true,
-                            title: Text(entry.key.toUpperCase(),
-                                style: const TextStyle(
+                        if (fugasRoturas.isNotEmpty) ...[
+                          const Padding(
+                            padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
+                            child: Text("🔧 POR ROTURA",
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.orangeAccent)),
+                          ),
+                          ...fugasRoturas.entries.map((e) => ListTile(
+                                dense: true,
+                                title: Text(e.key.toUpperCase(),
+                                    style: const TextStyle(color: Colors.orangeAccent)),
+                                trailing: Text("${e.value}",
+                                    style: const TextStyle(
+                                        color: Colors.orangeAccent,
+                                        fontWeight: FontWeight.bold)),
+                                subtitle: Text("Faltan ${e.value.abs()} unidades por rotura."),
+                              )),
+                        ],
+                        if (fugasPrestados.isNotEmpty) ...[
+                          const Padding(
+                            padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
+                            child: Text("🔄 POR PRESTADO",
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.blueAccent)),
+                          ),
+                          ...fugasPrestados.entries.map((e) => ListTile(
+                                dense: true,
+                                title: Text(e.key.toUpperCase(),
+                                    style: const TextStyle(color: Colors.blueAccent)),
+                                trailing: Text("${e.value}",
+                                    style: const TextStyle(
+                                        color: Colors.blueAccent,
+                                        fontWeight: FontWeight.bold)),
+                                subtitle: Text("Faltan ${e.value.abs()} unidades por préstamo."),
+                              )),
+                        ],
+                        if (fugasDesconocido.isNotEmpty) ...[
+                          const Padding(
+                            padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
+                            child: Text("❓ DESCONOCIDO",
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold,
                                     color: Colors.redAccent)),
-                            trailing: Text(
-                                entry.value < 0
-                                    ? "${entry.value}"
-                                    : "+${entry.value}",
-                                style: const TextStyle(
-                                    color: Colors.redAccent,
-                                    fontWeight: FontWeight.bold)),
-                            subtitle: Text(lugar != null
-                                ? "Viene de PRESTADO ($lugar)."
-                                : (entry.value < 0
-                                    ? "Faltan ${entry.value.abs()} unidades."
-                                    : "Sobran ${entry.value.abs()} unidades.")),
-                          );
-                        }),
+                          ),
+                          ...fugasDesconocido.entries.map((e) => ListTile(
+                                dense: true,
+                                title: Text(e.key.toUpperCase(),
+                                    style: const TextStyle(color: Colors.redAccent)),
+                                trailing: Text(
+                                    e.value < 0 ? "${e.value}" : "+${e.value}",
+                                    style: const TextStyle(
+                                        color: Colors.redAccent,
+                                        fontWeight: FontWeight.bold)),
+                                subtitle: Text(e.value < 0
+                                    ? "Faltan ${e.value.abs()} unidades sin motivo conocido."
+                                    : "Sobran ${e.value.abs()} unidades sin motivo conocido."),
+                              )),
+                        ],
                       ],
                       const Divider(),
                       ExpansionTile(

@@ -44,7 +44,9 @@ class StockService {
 
   static Future<void> guardarStock({
     required Map<String, int> stockFinal,
-    required Map<String, int> descuadres,
+    required Map<String, int> fugasRoturas,
+    required Map<String, int> fugasPrestados,
+    required Map<String, int> fugasDesconocido,
     required List<Map<String, dynamic>> movimientos,
   }) async {
     final id = _fechaId();
@@ -54,7 +56,11 @@ class StockService {
         FirebaseFields.timestamp: FieldValue.serverTimestamp(),
         FirebaseFields.movimientos: FieldValue.arrayUnion(movimientos),
         FirebaseFields.stockFinal: stockFinal,
-        FirebaseFields.fugas: descuadres,
+        FirebaseFields.fugas: {
+          'roturas': fugasRoturas,
+          'prestados': fugasPrestados,
+          'desconocido': fugasDesconocido,
+        },
       },
       SetOptions(merge: true),
     );
