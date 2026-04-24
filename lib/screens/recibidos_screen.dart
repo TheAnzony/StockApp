@@ -95,14 +95,14 @@ class _RecibidosScreenState extends State<RecibidosScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text("RECIBIR MATERIAL")),
-      body: StreamBuilder(
+      body: StreamBuilder<DocumentSnapshot>(
         stream: StockService.articulosStream(),
-        builder: (context, AsyncSnapshot<QuerySnapshot> snap) {
+        builder: (context, snap) {
           if (!snap.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
           final catalogo =
-              (snap.data!.docs.first.data() as Map).keys.whereType<String>().toList()
+              (snap.data!.data() as Map).keys.whereType<String>().toList()
                 ..sort();
 
           Widget bodyContent = Column(children: [
@@ -161,7 +161,7 @@ class _RecibidosScreenState extends State<RecibidosScreen> {
                   onPressed: productosAnadidos.isEmpty
                       ? null
                       : () async {
-                          final ref = await StockService.articulosRef();
+                          final ref = StockService.articulosRef();
                           final Map<String, dynamic> updates = {};
                           final List<Map<String, dynamic>> logs = [];
 

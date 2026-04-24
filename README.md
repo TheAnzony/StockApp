@@ -1,12 +1,21 @@
 # Stock Disco Pro
 
-**Versión actual: 1.0.8**
+**Versión actual: 1.0.9**
 
 Aplicación móvil y web para la gestión de stock de cachimbas en una discoteca. Permite controlar el inventario en tiempo real, registrar entradas, roturas y préstamos, y consultar el historial de movimientos por categoría.
 
 ---
 
 ## Historial de versiones
+
+### v1.0.9 — Refactor estructura Firestore + Catálogo con pestañas
+- Los sabores se almacenan ahora en `articulos/sabores` (mismo colección que `articulos/stock`)
+- Eliminada la colección separada `sabores/inventario`
+- `GestionCatalogoScreen` rediseñado con dos pestañas: STOCK y SABORES
+- Pestaña STOCK: gestión de artículos del inventario (añadir/eliminar)
+- Pestaña SABORES: gestión de sabores (añadir/eliminar) con visualización del stock
+- `StockService` refactorizado: referencias síncronas directas (`articulosRef()`, `saboresRef()`) sin `await`
+- Todas las pantallas actualizadas de `QuerySnapshot` a `DocumentSnapshot` para mayor eficiencia
 
 ### v1.0.8 — Nueva pantalla Carta
 - Pantalla Carta accesible desde el menú principal para todos los roles

@@ -211,12 +211,12 @@ class _InventarioScreenState extends State<InventarioScreen> {
 
     return StreamBuilder(
       stream: StockService.articulosStream(),
-      builder: (context, AsyncSnapshot<QuerySnapshot> snap) {
+      builder: (context, AsyncSnapshot<DocumentSnapshot> snap) {
         if (!snap.hasData) {
           return const Scaffold(
               body: Center(child: CircularProgressIndicator()));
         }
-        final doc = snap.data!.docs.first;
+        final doc = snap.data!;
         final data = doc.data() as Map<String, dynamic>;
         final List<String> keys = data.keys.toList()..sort();
         if (widget.modoEdicion && temp.isEmpty) {

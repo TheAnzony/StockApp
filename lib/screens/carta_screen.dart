@@ -30,7 +30,7 @@ class _CartaScreenState extends State<CartaScreen>
 
   Future<void> _init() async {
     final sabores = {for (var s in CartaConstants.saboresUnicos) s: 0};
-    await StockService.initSaboresIfNeeded(sabores);
+    await StockService.initSaboresIfNeeded(sabores); // usa articulos/sabores
   }
 
   @override

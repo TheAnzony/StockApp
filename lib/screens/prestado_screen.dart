@@ -16,7 +16,7 @@ class _PrestadoScreenState extends State<PrestadoScreen> {
   final TextEditingController _dest = TextEditingController();
 
   Future<void> _confirmar() async {
-    final ref = await StockService.articulosRef();
+    final ref = StockService.articulosRef();
     final Map<String, dynamic> updates = {};
     final List<Map<String, dynamic>> logs = [];
 
@@ -64,14 +64,13 @@ class _PrestadoScreenState extends State<PrestadoScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('PRESTADO')),
-      body: StreamBuilder(
+      body: StreamBuilder<DocumentSnapshot>(
         stream: StockService.articulosStream(),
-        builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
+        builder: (context, snapshot) {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
-          final data =
-              snapshot.data!.docs.first.data() as Map<String, dynamic>;
+          final data = snapshot.data!.data() as Map<String, dynamic>;
           final List<String> items = data.keys
               .where((k) =>
                   k.toLowerCase() != ArticuloConstants.mangueras &&

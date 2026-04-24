@@ -4,23 +4,49 @@ import '../constants/constants.dart';
 class StockService {
   static final _db = FirebaseFirestore.instance;
 
-  // ── Artículos ──────────────────────────────────────────────────────────────
+  // ── Artículos (stock) ──────────────────────────────────────────────────────
 
-  static Stream<QuerySnapshot> articulosStream() =>
-      _db.collection(FirebaseCollections.articulos).snapshots();
+  static DocumentReference get _stockRef =>
+      _db.collection(FirebaseCollections.articulos).doc('stock');
 
-  static Future<DocumentReference> articulosRef() async {
-    final snap = await _db.collection(FirebaseCollections.articulos).get();
-    return snap.docs.first.reference;
-  }
+  static Stream<DocumentSnapshot> articulosStream() => _stockRef.snapshots();
 
-  static Future<void> addArticulo(String nombre) async {
-    final ref = await articulosRef();
-    await ref.update({nombre.trim().toUpperCase(): 0});
-  }
+  static DocumentReference articulosRef() => _stockRef;
+
+  static Future<void> addArticulo(String nombre) =>
+      _stockRef.update({nombre.trim().toUpperCase(): 0});
 
   static Future<void> deleteArticulo(DocumentReference ref, String nombre) =>
       ref.update({nombre: FieldValue.delete()});
+
+  // ── Sabores ────────────────────────────────────────────────────────────────
+
+  static DocumentReference get _saboresRef =>
+      _db.collection(FirebaseCollections.articulos).doc('sabores');
+
+  static Stream<DocumentSnapshot> saboresStream() => _saboresRef.snapshots();
+
+  static DocumentReference saboresRef() => _saboresRef;
+
+  static Future<void> addSabor(String nombre) =>
+      _saboresRef.set({nombre.trim(): 0}, SetOptions(merge: true));
+
+  static Future<void> deleteSabor(String nombre) =>
+      _saboresRef.update({nombre: FieldValue.delete()});
+
+  static Future<void> initSaboresIfNeeded(Map<String, int> sabores) async {
+    final doc = await _saboresRef.get();
+    if (!doc.exists) {
+      await _saboresRef.set(sabores);
+    } else {
+      final existing = doc.data() as Map<String, dynamic>;
+      final nuevos = <String, dynamic>{};
+      sabores.forEach((k, v) {
+        if (!existing.containsKey(k)) nuevos[k] = v;
+      });
+      if (nuevos.isNotEmpty) await _saboresRef.update(nuevos);
+    }
+  }
 
   // ── Logs ───────────────────────────────────────────────────────────────────
 
@@ -85,27 +111,6 @@ class StockService {
           .collection(FirebaseCollections.ajustes)
           .doc(FirebaseCollections.configuracion)
           .set({FirebaseFields.stockForzado: value}, SetOptions(merge: true));
-
-  // ── Sabores ────────────────────────────────────────────────────────────────
-
-  static Stream<DocumentSnapshot> saboresStream() =>
-      _db.collection('sabores').doc('inventario').snapshots();
-
-  static Future<void> initSaboresIfNeeded(Map<String, int> sabores) async {
-    final doc = await _db.collection('sabores').doc('inventario').get();
-    if (!doc.exists) {
-      await _db.collection('sabores').doc('inventario').set(sabores);
-    } else {
-      final existing = doc.data() as Map<String, dynamic>;
-      final nuevos = <String, dynamic>{};
-      sabores.forEach((k, v) {
-        if (!existing.containsKey(k)) nuevos[k] = v;
-      });
-      if (nuevos.isNotEmpty) {
-        await _db.collection('sabores').doc('inventario').update(nuevos);
-      }
-    }
-  }
 
   // ── Trabajadores ───────────────────────────────────────────────────────────
 

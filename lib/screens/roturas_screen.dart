@@ -25,7 +25,7 @@ class _RoturasScreenState extends State<RoturasScreen> {
   }
 
   Future<void> _confirmar() async {
-    final ref = await StockService.articulosRef();
+    final ref = StockService.articulosRef();
     final Map<String, dynamic> updates = {};
     final List<Map<String, dynamic>> logs = [];
 
