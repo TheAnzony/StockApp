@@ -86,6 +86,27 @@ class StockService {
           .doc(FirebaseCollections.configuracion)
           .set({FirebaseFields.stockForzado: value}, SetOptions(merge: true));
 
+  // ── Sabores ────────────────────────────────────────────────────────────────
+
+  static Stream<DocumentSnapshot> saboresStream() =>
+      _db.collection('sabores').doc('inventario').snapshots();
+
+  static Future<void> initSaboresIfNeeded(Map<String, int> sabores) async {
+    final doc = await _db.collection('sabores').doc('inventario').get();
+    if (!doc.exists) {
+      await _db.collection('sabores').doc('inventario').set(sabores);
+    } else {
+      final existing = doc.data() as Map<String, dynamic>;
+      final nuevos = <String, dynamic>{};
+      sabores.forEach((k, v) {
+        if (!existing.containsKey(k)) nuevos[k] = v;
+      });
+      if (nuevos.isNotEmpty) {
+        await _db.collection('sabores').doc('inventario').update(nuevos);
+      }
+    }
+  }
+
   // ── Trabajadores ───────────────────────────────────────────────────────────
 
   static Stream<QuerySnapshot> trabajadoresStream({required bool activo}) =>

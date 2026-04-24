@@ -11,6 +11,7 @@ import 'historial_seleccion_screen.dart';
 import 'gestion_catalogo_screen.dart';
 import 'gestion_personal_screen.dart';
 import 'configuracion_screen.dart';
+import 'carta_screen.dart';
 
 class MenuPrincipal extends StatelessWidget {
   const MenuPrincipal({super.key});
@@ -76,6 +77,8 @@ class MenuPrincipal extends StatelessWidget {
                 if (puedeHacerStock && (isAdmin || esEncargado))
                   _btn(context, 'REALIZAR STOCK', Icons.fact_check,
                       Colors.cyan, const InventarioScreen(modoEdicion: true), esEscritorio: esEscritorio),
+                _btn(context, 'CARTA', Icons.menu_book, Colors.indigo,
+                    const CartaScreen(), esEscritorio: esEscritorio),
                 _btn(context, 'RECIBIDO', Icons.download, Colors.green,
                     const RecibidosScreen(), esEscritorio: esEscritorio),
                 _btn(context, 'ROTURAS', Icons.report_problem, Colors.red,
