@@ -3,14 +3,14 @@ import '../constants/constants.dart';
 class Trabajador {
   final String id;
   final String nombre;
-  final String pin;
+  final String emailAuth;
   final RolUsuario rol;
   final bool activo;
 
   Trabajador({
     required this.id,
     required this.nombre,
-    required this.pin,
+    required this.emailAuth,
     required this.rol,
     required this.activo,
   });
@@ -19,7 +19,7 @@ class Trabajador {
     return Trabajador(
       id: id,
       nombre: map['nombre'] ?? '',
-      pin: map['pin'].toString(),
+      emailAuth: map['email_auth'] ?? '',
       rol: RolUsuario.fromString(map['rol'] ?? 'trabajador'),
       activo: map['activo'] ?? false,
     );
@@ -27,7 +27,7 @@ class Trabajador {
 
   Map<String, dynamic> toMap() => {
         'nombre': nombre,
-        'pin': pin,
+        'email_auth': emailAuth,
         'rol': rol.label,
         'activo': activo,
       };

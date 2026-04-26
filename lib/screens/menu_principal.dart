@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../session.dart';
 import '../services/stock_service.dart';
+import '../services/auth_service.dart';
+import '../services/session_service.dart';
 import 'login_screen.dart';
 import 'inventario_screen.dart';
 import 'recibidos_screen.dart';
@@ -13,8 +15,39 @@ import 'gestion_personal_screen.dart';
 import 'configuracion_screen.dart';
 import 'carta_screen.dart';
 
-class MenuPrincipal extends StatelessWidget {
+class MenuPrincipal extends StatefulWidget {
   const MenuPrincipal({super.key});
+
+  @override
+  State<MenuPrincipal> createState() => _MenuPrincipalState();
+}
+
+class _MenuPrincipalState extends State<MenuPrincipal> {
+  @override
+  void initState() {
+    super.initState();
+    SessionService.onTimeout = _autoLogout;
+    SessionService.startTimer();
+  }
+
+  @override
+  void dispose() {
+    SessionService.cancelTimer();
+    super.dispose();
+  }
+
+  Future<void> _autoLogout() async {
+    await AuthService.signOut();
+    await SessionService.clear();
+    usuarioActual = null;
+    if (mounted) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (_) => false,
+      );
+    }
+  }
 
   Future<bool?> _dialogoCerrarSesion(BuildContext context) {
     return showDialog<bool>(
@@ -42,14 +75,21 @@ class MenuPrincipal extends StatelessWidget {
     final bool isAdmin = rol == 'admin';
     final bool esEncargado = rol == 'encargado';
 
-    return PopScope(
+    return Listener(
+      onPointerDown: (_) => SessionService.updateActivity(),
+      child: PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
         final salir = await _dialogoCerrarSesion(context);
         if (salir == true && context.mounted) {
-          Navigator.pushReplacement(context,
-              MaterialPageRoute(builder: (_) => const LoginScreen()));
+          await AuthService.signOut();
+          await SessionService.clear();
+          usuarioActual = null;
+          if (context.mounted) {
+            Navigator.pushReplacement(context,
+                MaterialPageRoute(builder: (_) => const LoginScreen()));
+          }
         }
       },
       child: StreamBuilder<DocumentSnapshot>(
@@ -116,10 +156,15 @@ class MenuPrincipal extends StatelessWidget {
                     onPressed: () async {
                       final salir = await _dialogoCerrarSesion(context);
                       if (salir == true && context.mounted) {
-                        Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const LoginScreen()));
+                        await AuthService.signOut();
+                        await SessionService.clear();
+                        usuarioActual = null;
+                        if (context.mounted) {
+                          Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const LoginScreen()));
+                        }
                       }
                     }),
               ],
@@ -135,7 +180,8 @@ class MenuPrincipal extends StatelessWidget {
           );
         },
       ),
-    );
+    ),   // PopScope
+    );   // Listener
   }
 
   Widget _btn(

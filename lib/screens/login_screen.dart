@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../session.dart';
 import '../services/stock_service.dart';
+import '../services/auth_service.dart';
+import '../services/session_service.dart';
 import 'menu_principal.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -35,7 +38,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _mostrarNotificacionError(BuildContext context) {
+  void _mostrarNotificacionError(BuildContext context, String mensaje) {
     final overlay = Overlay.of(context);
     late OverlayEntry entry;
     entry = OverlayEntry(
@@ -52,13 +55,13 @@ class _LoginScreenState extends State<LoginScreen> {
               color: Colors.red.shade700,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Row(
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.lock, color: Colors.white, size: 18),
-                SizedBox(width: 8),
-                Text('PIN INCORRECTO',
-                    style: TextStyle(
+                const Icon(Icons.lock, color: Colors.white, size: 18),
+                const SizedBox(width: 8),
+                Text(mensaje,
+                    style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
                         fontSize: 16)),
@@ -73,9 +76,11 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _mostrarTeclado(BuildContext context, DocumentSnapshot doc) {
-    String pinIntroducido = "";
+    String pinIntroducido = '';
+    bool cargando = false;
 
     final bool esEscritorio = MediaQuery.of(context).size.width > 600;
+    final focusNode = FocusNode();
 
     showModalBottomSheet(
       context: context,
@@ -86,17 +91,54 @@ class _LoginScreenState extends State<LoginScreen> {
       builder: (modalContext) {
         return StatefulBuilder(
           builder: (modalContext, setModalState) {
-            void agregarNum(String n) =>
-                setModalState(() => pinIntroducido += n);
-            void borrarUno() => setModalState(() {
-                  if (pinIntroducido.isNotEmpty) {
-                    pinIntroducido =
-                        pinIntroducido.substring(0, pinIntroducido.length - 1);
-                  }
+            void agregarNum(String n) {
+              if (!cargando) setModalState(() => pinIntroducido += n);
+            }
+
+            void borrarUno() {
+              if (!cargando && pinIntroducido.isNotEmpty) {
+                setModalState(() => pinIntroducido =
+                    pinIntroducido.substring(0, pinIntroducido.length - 1));
+              }
+            }
+
+            Future<void> verificar() async {
+              if (cargando || pinIntroducido.isEmpty) return;
+
+              final data = doc.data() as Map<String, dynamic>? ?? {};
+              final emailAuth = data['email_auth'] as String? ?? '';
+              if (emailAuth.isEmpty) {
+                _mostrarNotificacionError(context, 'SIN EMAIL_AUTH');
+                return;
+              }
+
+              setModalState(() => cargando = true);
+
+              final ok = await AuthService.login(emailAuth, pinIntroducido);
+
+              if (!modalContext.mounted) return;
+
+              if (ok) {
+                final info = {
+                  'nombre': doc['nombre'],
+                  'rol': doc['rol'],
+                  'id': doc.id,
+                };
+                usuarioActual = info;
+                await SessionService.saveUserInfo(info);
+                if (!modalContext.mounted) return;
+                Navigator.pop(modalContext);
+                if (context.mounted) {
+                  Navigator.pushReplacement(context,
+                      MaterialPageRoute(builder: (_) => const MenuPrincipal()));
+                }
+              } else {
+                setModalState(() {
+                  cargando = false;
+                  pinIntroducido = '';
                 });
-            void mostrarError() {
-              setModalState(() => pinIntroducido = "");
-              _mostrarNotificacionError(context);
+                _mostrarNotificacionError(context, 'PIN INCORRECTO');
+              }
             }
 
             Widget teclado = Container(
@@ -117,14 +159,19 @@ class _LoginScreenState extends State<LoginScreen> {
                     decoration: BoxDecoration(
                         color: Colors.black,
                         borderRadius: BorderRadius.circular(16)),
-                    child: Text(
-                        pinIntroducido.isEmpty
-                            ? "----"
-                            : "*" * pinIntroducido.length,
-                        style: const TextStyle(
-                            fontSize: 38,
-                            letterSpacing: 10,
-                            color: Colors.white)),
+                    child: cargando
+                        ? const SizedBox(
+                            width: 28,
+                            height: 28,
+                            child: CircularProgressIndicator(strokeWidth: 3))
+                        : Text(
+                            pinIntroducido.isEmpty
+                                ? '----'
+                                : '*' * pinIntroducido.length,
+                            style: const TextStyle(
+                                fontSize: 38,
+                                letterSpacing: 10,
+                                color: Colors.white)),
                   ),
                   const SizedBox(height: 14),
                   GridView.count(
@@ -136,38 +183,64 @@ class _LoginScreenState extends State<LoginScreen> {
                     childAspectRatio: 1.6,
                     children: [
                       for (var i = 1; i <= 9; i++)
-                        _btnN(i.toString(), () => agregarNum(i.toString())),
+                        _btnN(i.toString(), () => agregarNum(i.toString()),
+                            disabled: cargando),
                       _btnI(Icons.close, Colors.red,
-                          () => Navigator.pop(modalContext)),
-                      _btnN("0", () => agregarNum("0")),
-                      _btnI(Icons.backspace, Colors.orange, borrarUno),
-                      _btnN("C",
-                          () => setModalState(() => pinIntroducido = ""),
-                          color: Colors.blueGrey),
+                          () => Navigator.pop(modalContext),
+                          disabled: cargando),
+                      _btnN('0', () => agregarNum('0'), disabled: cargando),
+                      _btnI(Icons.backspace, Colors.orange, borrarUno,
+                          disabled: cargando),
+                      _btnN('C',
+                          () => setModalState(() => pinIntroducido = ''),
+                          color: Colors.blueGrey, disabled: cargando),
                       const SizedBox.shrink(),
-                      _btnI(Icons.check_circle, Colors.green, () {
-                        if (pinIntroducido == doc['pin'].toString()) {
-                          usuarioActual = {
-                            'nombre': doc['nombre'],
-                            'rol': doc['rol'],
-                            'id': doc.id,
-                          };
-                          Navigator.pop(modalContext);
-                          Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => const MenuPrincipal()));
-                        } else {
-                          mostrarError();
-                        }
-                      }),
+                      _btnI(Icons.check_circle, Colors.green, verificar,
+                          disabled: cargando),
                     ],
                   ),
                 ],
               ),
             );
 
-            if (!esEscritorio) return teclado;
+            // En escritorio capturamos el teclado físico
+            final tecladoFinal = esEscritorio
+                ? Focus(
+                    focusNode: focusNode,
+                    autofocus: true,
+                    onKeyEvent: (_, event) {
+                      if (event is! KeyDownEvent || cargando) {
+                        return KeyEventResult.ignored;
+                      }
+                      final k = event.logicalKey;
+                      // Dígitos fila numérica y teclado numérico
+                      final label = k.keyLabel;
+                      if (label.length == 1 &&
+                          label.codeUnitAt(0) >= 48 &&
+                          label.codeUnitAt(0) <= 57) {
+                        agregarNum(label);
+                        return KeyEventResult.handled;
+                      }
+                      if (k == LogicalKeyboardKey.backspace) {
+                        borrarUno();
+                        return KeyEventResult.handled;
+                      }
+                      if (k == LogicalKeyboardKey.enter ||
+                          k == LogicalKeyboardKey.numpadEnter) {
+                        verificar();
+                        return KeyEventResult.handled;
+                      }
+                      if (k == LogicalKeyboardKey.escape) {
+                        Navigator.pop(modalContext);
+                        return KeyEventResult.handled;
+                      }
+                      return KeyEventResult.ignored;
+                    },
+                    child: teclado,
+                  )
+                : teclado;
+
+            if (!esEscritorio) return tecladoFinal;
 
             return Column(
               mainAxisSize: MainAxisSize.min,
@@ -175,7 +248,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 Center(
                   child: SizedBox(
                     width: MediaQuery.of(context).size.width * 0.45,
-                    child: teclado,
+                    child: tecladoFinal,
                   ),
                 ),
               ],
@@ -186,23 +259,28 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _btnN(String t, VoidCallback onTap, {Color? color}) => ElevatedButton(
-      style: ElevatedButton.styleFrom(
-          backgroundColor: color ?? const Color(0xFF333333),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-      onPressed: onTap,
-      child: Text(t,
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)));
+  Widget _btnN(String t, VoidCallback onTap,
+          {Color? color, bool disabled = false}) =>
+      ElevatedButton(
+          style: ElevatedButton.styleFrom(
+              backgroundColor: color ?? const Color(0xFF333333),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12))),
+          onPressed: disabled ? null : onTap,
+          child: Text(t,
+              style:
+                  const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)));
 
-  Widget _btnI(IconData i, Color c, VoidCallback onTap) => ElevatedButton(
-      style: ElevatedButton.styleFrom(
-          backgroundColor: c.withValues(alpha: 0.15),
-          side: BorderSide(color: c),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-      onPressed: onTap,
-      child: Icon(i, color: c, size: 24));
+  Widget _btnI(IconData i, Color c, VoidCallback onTap,
+          {bool disabled = false}) =>
+      ElevatedButton(
+          style: ElevatedButton.styleFrom(
+              backgroundColor: c.withValues(alpha: 0.15),
+              side: BorderSide(color: disabled ? Colors.grey : c),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12))),
+          onPressed: disabled ? null : onTap,
+          child: Icon(i, color: disabled ? Colors.grey : c, size: 24));
 
   @override
   Widget build(BuildContext context) {

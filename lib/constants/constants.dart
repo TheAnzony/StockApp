@@ -82,7 +82,7 @@ class FirebaseCollections {
 class FirebaseFields {
   static const String activo = 'activo';
   static const String nombre = 'nombre';
-  static const String pin = 'pin';
+  static const String emailAuth = 'email_auth';
   static const String rol = 'rol';
   static const String id = 'id';
   static const String fechaId = 'fecha_id';
