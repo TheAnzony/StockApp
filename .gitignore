@@ -52,3 +52,6 @@ serviceAccount.json
 
 # Node
 node_modules/
+
+# Backups de Firestore (datos reales, no subir)
+copia-firestore/backup_*.json
