@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/sabor.dart';
 import '../session.dart';
 import '../services/stock_service.dart';
 
@@ -10,77 +11,75 @@ class RecibidosScreen extends StatefulWidget {
 }
 
 class _RecibidosScreenState extends State<RecibidosScreen> {
-  List<Map<String, dynamic>> productosAnadidos = [];
+  // Cada item: articulo, cantidad, concepto?, origen?, esSabor
+  final List<Map<String, dynamic>> _lista = [];
 
-  void _abrirSelector(List<String> catalogo) {
-    String? temporalArt;
-    final cantController = TextEditingController(text: "1");
-    final origenController = TextEditingController();
-    String temporalConcepto = "STOCK NUEVO";
+  // ── Selector de artículo ──────────────────────────────────────────────────
+
+  void _abrirSelectorArticulo(List<String> catalogo) {
+    String? art;
+    final cantCtrl = TextEditingController(text: '1');
+    final origenCtrl = TextEditingController();
+    String concepto = 'STOCK NUEVO';
 
     showDialog(
       context: context,
       builder: (c) => StatefulBuilder(
         builder: (context, setSt) => AlertDialog(
-          title: const Text("Añadir Producto"),
+          title: const Text('Añadir Artículo'),
           content: SingleChildScrollView(
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               DropdownButtonFormField<String>(
-                decoration: const InputDecoration(labelText: "Artículo"),
+                decoration: const InputDecoration(labelText: 'Artículo'),
                 items: catalogo
-                    .map((e) =>
-                        DropdownMenuItem(value: e, child: Text(e.toUpperCase())))
+                    .map((e) => DropdownMenuItem(value: e, child: Text(e.toUpperCase())))
                     .toList(),
-                onChanged: (v) => temporalArt = v,
+                onChanged: (v) => art = v,
               ),
-              const SizedBox(height: 15),
+              const SizedBox(height: 14),
               TextField(
-                controller: cantController,
+                controller: cantCtrl,
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
-                    labelText: "Cantidad", border: OutlineInputBorder()),
+                    labelText: 'Cantidad', border: OutlineInputBorder()),
               ),
-              const SizedBox(height: 15),
+              const SizedBox(height: 14),
               DropdownButtonFormField<String>(
-                value: temporalConcepto,
-                decoration: const InputDecoration(labelText: "Concepto"),
-                items: ["STOCK NUEVO", "DEVOLUCIÓN PRESTADO"]
+                initialValue: concepto,
+                decoration: const InputDecoration(labelText: 'Concepto'),
+                items: ['STOCK NUEVO', 'DEVOLUCIÓN PRESTADO']
                     .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                     .toList(),
-                onChanged: (v) => setSt(() => temporalConcepto = v!),
+                onChanged: (v) => setSt(() => concepto = v!),
               ),
-              if (temporalConcepto == "DEVOLUCIÓN PRESTADO") ...[
-                const SizedBox(height: 15),
+              if (concepto == 'DEVOLUCIÓN PRESTADO') ...[
+                const SizedBox(height: 14),
                 TextField(
-                  controller: origenController,
-                  decoration:
-                      const InputDecoration(labelText: "¿De dónde viene?"),
+                  controller: origenCtrl,
+                  decoration: const InputDecoration(labelText: '¿De dónde viene?'),
                   textCapitalization: TextCapitalization.characters,
                 ),
               ],
             ]),
           ),
           actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(c),
-                child: const Text("CANCELAR")),
+            TextButton(onPressed: () => Navigator.pop(c), child: const Text('CANCELAR')),
             ElevatedButton(
               onPressed: () {
-                if (temporalArt != null) {
-                  setState(() {
-                    productosAnadidos.add({
-                      'articulo': temporalArt,
-                      'cantidad': int.tryParse(cantController.text) ?? 1,
-                      'concepto': temporalConcepto,
-                      'origen': temporalConcepto == "DEVOLUCIÓN PRESTADO"
-                          ? origenController.text
-                          : null,
-                    });
-                  });
+                if (art != null) {
+                  setState(() => _lista.add({
+                        'articulo': art,
+                        'cantidad': int.tryParse(cantCtrl.text) ?? 1,
+                        'concepto': concepto,
+                        'origen': concepto == 'DEVOLUCIÓN PRESTADO'
+                            ? origenCtrl.text
+                            : null,
+                        'esSabor': false,
+                      }));
                   Navigator.pop(c);
                 }
               },
-              child: const Text("AÑADIR"),
+              child: const Text('AÑADIR'),
             ),
           ],
         ),
@@ -88,13 +87,152 @@ class _RecibidosScreenState extends State<RecibidosScreen> {
     );
   }
 
+  // ── Selector de sabor ─────────────────────────────────────────────────────
+
+  Future<void> _abrirSelectorSabor() async {
+    final snap = await StockService.saboresRef().get();
+    if (!snap.exists || !mounted) return;
+
+    final data = snap.data() as Map<String, dynamic>;
+    final sabores = data.entries
+        .map((e) => Sabor.fromEntry(e.key, e.value))
+        .toList()
+      ..sort((a, b) => a.nombre.compareTo(b.nombre));
+
+    if (!mounted) return;
+
+    Sabor? sabor;
+    final cantCtrl = TextEditingController(text: '1');
+
+    showDialog(
+      context: context,
+      builder: (c) => StatefulBuilder(
+        builder: (context, setSt) => AlertDialog(
+          title: const Text('Añadir Sabor'),
+          contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            DropdownButtonFormField<Sabor>(
+              decoration: const InputDecoration(labelText: 'Sabor'),
+              isExpanded: true,
+              // Texto compacto al seleccionar: "Nombre · Marca · Formato"
+              selectedItemBuilder: (context) => sabores
+                  .map((s) => Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          '${s.nombre}  ·  ${s.marca}  ·  ${s.formato}',
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ))
+                  .toList(),
+              items: sabores
+                  .map((s) => DropdownMenuItem(
+                        value: s,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(s.nombre,
+                                style: const TextStyle(fontWeight: FontWeight.bold)),
+                            if (s.marca.isNotEmpty)
+                              Text('${s.marca}  ·  ${s.formato}',
+                                  style: const TextStyle(
+                                      fontSize: 11, color: Colors.grey)),
+                          ],
+                        ),
+                      ))
+                  .toList(),
+              onChanged: (v) => setSt(() => sabor = v),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: cantCtrl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                  labelText: 'Cantidad recibida', border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 4),
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c), child: const Text('CANCELAR')),
+            ElevatedButton(
+              onPressed: () {
+                if (sabor != null) {
+                  setState(() => _lista.add({
+                        'articulo': sabor!.nombre,
+                        'cantidad': int.tryParse(cantCtrl.text) ?? 1,
+                        'formato': sabor!.formato,
+                        'marca': sabor!.marca,
+                        'esSabor': true,
+                      }));
+                  Navigator.pop(c);
+                }
+              },
+              child: const Text('AÑADIR'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Confirmar recepción ───────────────────────────────────────────────────
+
+  Future<void> _confirmar() async {
+    final articulos = _lista.where((p) => p['esSabor'] != true).toList();
+    final sabores   = _lista.where((p) => p['esSabor'] == true).toList();
+
+    // Artículos: actualizar stock + log
+    if (articulos.isNotEmpty) {
+      final Map<String, dynamic> updates = {};
+      final List<Map<String, dynamic>> logs = [];
+      for (final p in articulos) {
+        final String art = p['articulo'];
+        final int cant = p['cantidad'];
+        updates[art] = FieldValue.increment(cant);
+        String conceptoFinal = p['concepto'];
+        if (p['origen'] != null && p['origen'].toString().isNotEmpty) {
+          conceptoFinal += ' (${p['origen']})';
+        }
+        logs.add({
+          'articulo': art.toUpperCase(),
+          'cantidad': cant,
+          'fecha': DateTime.now(),
+          'motivo': 'RECIBIDO',
+          'concepto': conceptoFinal,
+          'operador': usuarioActual?['nombre'] ?? '?',
+        });
+      }
+      await StockService.articulosRef().update(updates);
+      await StockService.agregarMovimientos(logs);
+    }
+
+    // Sabores: incrementar .cantidad con dot notation
+    if (sabores.isNotEmpty) {
+      final Map<String, dynamic> saborUpdates = {};
+      for (final p in sabores) {
+        saborUpdates['${p['articulo']}.cantidad'] =
+            FieldValue.increment(p['cantidad'] as int);
+      }
+      await StockService.saboresRef().update(saborUpdates);
+    }
+
+    if (mounted) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('✅ Entrada confirmada')));
+    }
+  }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     final double sw = MediaQuery.of(context).size.width;
     final bool dt = sw > 600;
 
     return Scaffold(
-      appBar: AppBar(title: const Text("RECIBIR MATERIAL")),
+      appBar: AppBar(title: const Text('RECIBIR MATERIAL')),
       body: StreamBuilder<DocumentSnapshot>(
         stream: StockService.articulosStream(),
         builder: (context, snap) {
@@ -102,37 +240,44 @@ class _RecibidosScreenState extends State<RecibidosScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           final catalogo =
-              (snap.data!.data() as Map).keys.whereType<String>().toList()
-                ..sort();
+              (snap.data!.data() as Map).keys.whereType<String>().toList()..sort();
 
           Widget bodyContent = Column(children: [
             Expanded(
-              child: productosAnadidos.isEmpty
-                  ? const Center(child: Text("Lista vacía"))
+              child: _lista.isEmpty
+                  ? const Center(child: Text('Lista vacía'))
                   : ListView.builder(
                       padding: const EdgeInsets.all(10),
-                      itemCount: productosAnadidos.length,
+                      itemCount: _lista.length,
                       itemBuilder: (context, index) {
-                        final p = productosAnadidos[index];
+                        final p = _lista[index];
+                        final esSabor = p['esSabor'] == true;
+                        final titulo = esSabor
+                            ? '${p['articulo']}  (x${p['cantidad']})'
+                            : '${p['articulo'].toString().toUpperCase()}  (x${p['cantidad']})';
+                        final subtitulo = esSabor
+                            ? '${p['marca'] ?? ''}  ·  ${p['formato'] ?? ''}'
+                            : '${p['concepto']}${p['origen'] != null ? '  [${p['origen']}]' : ''}';
+                        final color = esSabor
+                            ? Colors.indigo
+                            : (p['origen'] != null ? Colors.cyan : Colors.green);
+
                         return Card(
                           child: ListTile(
-                            title: Text(
-                                "${p['articulo'].toString().toUpperCase()} (x${p['cantidad']})"),
-                            subtitle: Text(
-                              p['concepto'] +
-                                  (p['origen'] != null
-                                      ? " [${p['origen']}]"
-                                      : ""),
-                              style: TextStyle(
-                                  color: p['origen'] != null
-                                      ? Colors.cyan
-                                      : Colors.green),
+                            leading: Icon(
+                              esSabor
+                                  ? Icons.local_fire_department
+                                  : Icons.inventory_2,
+                              color: color,
                             ),
+                            title: Text(titulo,
+                                style: const TextStyle(fontWeight: FontWeight.bold)),
+                            subtitle: Text(subtitulo,
+                                style: TextStyle(color: color, fontSize: 12)),
                             trailing: IconButton(
-                              icon: const Icon(Icons.delete,
-                                  color: Colors.redAccent),
-                              onPressed: () => setState(
-                                  () => productosAnadidos.removeAt(index)),
+                              icon: const Icon(Icons.delete, color: Colors.redAccent),
+                              onPressed: () =>
+                                  setState(() => _lista.removeAt(index)),
                             ),
                           ),
                         );
@@ -140,61 +285,46 @@ class _RecibidosScreenState extends State<RecibidosScreen> {
                     ),
             ),
             Container(
-              padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(color: Color(0xFF1E1E1E)),
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(
+                color: Color(0xFF1E1E1E),
+                border: Border(top: BorderSide(color: Colors.white10)),
+              ),
               child: Column(children: [
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(50),
-                      backgroundColor: const Color(0xFF1976D2)),
-                  onPressed: () => _abrirSelector(catalogo),
-                  icon: const Icon(Icons.add),
-                  label: const Text("AÑADIR PRODUCTO",
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold, color: Colors.white)),
-                ),
+                Row(children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                          minimumSize: const Size(0, 48),
+                          backgroundColor: const Color(0xFF1976D2)),
+                      onPressed: () => _abrirSelectorArticulo(catalogo),
+                      icon: const Icon(Icons.inventory_2, size: 18),
+                      label: const Text('ARTÍCULO',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, color: Colors.white)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                          minimumSize: const Size(0, 48),
+                          backgroundColor: Colors.indigo),
+                      onPressed: _abrirSelectorSabor,
+                      icon: const Icon(Icons.local_fire_department, size: 18),
+                      label: const Text('SABOR',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, color: Colors.white)),
+                    ),
+                  ),
+                ]),
                 const SizedBox(height: 10),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                       minimumSize: const Size.fromHeight(50),
                       backgroundColor: const Color(0xFF2E7D32)),
-                  onPressed: productosAnadidos.isEmpty
-                      ? null
-                      : () async {
-                          final ref = StockService.articulosRef();
-                          final Map<String, dynamic> updates = {};
-                          final List<Map<String, dynamic>> logs = [];
-
-                          for (var p in productosAnadidos) {
-                            final String art = p['articulo'];
-                            final int cant = p['cantidad'];
-                            updates[art] = FieldValue.increment(cant);
-                            String conceptoFinal = p['concepto'];
-                            if (p['origen'] != null &&
-                                p['origen'].toString().isNotEmpty) {
-                              conceptoFinal += " (${p['origen']})";
-                            }
-                            logs.add({
-                              'articulo': art.toUpperCase(),
-                              'cantidad': cant,
-                              'fecha': DateTime.now(),
-                              'motivo': 'RECIBIDO',
-                              'concepto': conceptoFinal,
-                              'operador': usuarioActual?['nombre'] ?? 'Admin',
-                            });
-                          }
-
-                          await ref.update(updates);
-                          await StockService.agregarMovimientos(logs);
-
-                          if (mounted) {
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text("✅ Entrada confirmada")));
-                          }
-                        },
-                  child: const Text("CONFIRMAR RECEPCIÓN",
+                  onPressed: _lista.isEmpty ? null : _confirmar,
+                  child: const Text('CONFIRMAR RECEPCIÓN',
                       style: TextStyle(
                           fontWeight: FontWeight.bold, color: Colors.white)),
                 ),

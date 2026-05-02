@@ -26,27 +26,65 @@ class _GestionCatalogoScreenState extends State<GestionCatalogoScreen>
   }
 
   void _dialogoAnadir({required bool esSabor}) {
-    final ctrl = TextEditingController();
+    final ctrlNombre = TextEditingController();
+    final ctrlMarca = TextEditingController();
+    final ctrlFormato = TextEditingController();
+    final ctrlCantidad = TextEditingController(text: '0');
+
     showDialog(
       context: context,
       builder: (c) => AlertDialog(
         title: Text(esSabor ? 'Nuevo Sabor' : 'Nuevo Producto'),
-        content: TextField(
-          controller: ctrl,
-          decoration: const InputDecoration(labelText: 'Nombre'),
-          textCapitalization: TextCapitalization.words,
-        ),
+        content: esSabor
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: ctrlNombre,
+                    decoration: const InputDecoration(labelText: 'Nombre'),
+                    textCapitalization: TextCapitalization.words,
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: ctrlMarca,
+                    decoration: const InputDecoration(labelText: 'Marca'),
+                    textCapitalization: TextCapitalization.words,
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: ctrlFormato,
+                    decoration:
+                        const InputDecoration(labelText: 'Formato (50gr, 100gr, 200gr...)'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: ctrlCantidad,
+                    decoration: const InputDecoration(labelText: 'Cantidad inicial'),
+                    keyboardType: TextInputType.number,
+                  ),
+                ],
+              )
+            : TextField(
+                controller: ctrlNombre,
+                decoration: const InputDecoration(labelText: 'Nombre'),
+                textCapitalization: TextCapitalization.words,
+              ),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(c),
               child: const Text('CANCELAR')),
           ElevatedButton(
             onPressed: () async {
-              if (ctrl.text.isNotEmpty) {
+              if (ctrlNombre.text.isNotEmpty) {
                 if (esSabor) {
-                  await StockService.addSabor(ctrl.text);
+                  await StockService.addSabor(
+                    ctrlNombre.text,
+                    ctrlMarca.text,
+                    ctrlFormato.text,
+                    int.tryParse(ctrlCantidad.text) ?? 0,
+                  );
                 } else {
-                  await StockService.addArticulo(ctrl.text);
+                  await StockService.addArticulo(ctrlNombre.text);
                 }
                 if (c.mounted) Navigator.pop(c);
               }
@@ -107,6 +145,17 @@ class _GestionCatalogoScreenState extends State<GestionCatalogoScreen>
           itemCount: keys.length,
           itemBuilder: (context, index) {
             final String k = keys[index];
+            String? subtitulo;
+            if (esSabor) {
+              final val = data[k];
+              if (val is Map<String, dynamic>) {
+                final marca = val['marca'] as String? ?? '';
+                final formato = val['formato'] as String? ?? '';
+                final cantidad = (val['cantidad'] as num?)?.toInt() ?? 0;
+                subtitulo =
+                    '${marca.isNotEmpty ? marca : ''}${marca.isNotEmpty && formato.isNotEmpty ? '  ·  ' : ''}$formato  ($cantidad uds)';
+              }
+            }
             return Card(
               child: ListTile(
                 leading: Icon(
@@ -114,6 +163,9 @@ class _GestionCatalogoScreenState extends State<GestionCatalogoScreen>
                   color: color,
                 ),
                 title: Text(esSabor ? k : k.toUpperCase()),
+                subtitle: subtitulo != null
+                    ? Text(subtitulo, style: const TextStyle(fontSize: 12))
+                    : null,
                 trailing: IconButton(
                   icon: const Icon(Icons.delete_sweep, color: Colors.redAccent),
                   onPressed: () =>

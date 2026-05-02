@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'historial_filtrado_screen.dart';
+import 'historial_pedidos_screen.dart';
 
 class SeleccionHistorialScreen extends StatelessWidget {
   const SeleccionHistorialScreen({super.key});
@@ -16,6 +17,7 @@ class SeleccionHistorialScreen extends StatelessWidget {
         _item(context, 'ROTURAS', Colors.red, 'ROTURAS'),
         _item(context, 'PRESTADOS', Colors.orange, 'PRESTADO'),
         _item(context, 'GENERALES', Colors.blue, 'GENERAL'),
+        _itemPedidos(context),
       ],
     );
 
@@ -39,6 +41,15 @@ class SeleccionHistorialScreen extends StatelessWidget {
               MaterialPageRoute(
                   builder: (_) => HistorialFiltradoScreen(
                       filtro: filtro, titulo: titulo))),
+        ),
+      );
+
+  Widget _itemPedidos(BuildContext context) => Card(
+        child: ListTile(
+          leading: const Icon(Icons.shopping_cart_checkout, color: Colors.deepOrange),
+          title: const Text('PEDIDOS'),
+          onTap: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const HistorialPedidosScreen())),
         ),
       );
 }

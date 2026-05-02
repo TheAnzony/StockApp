@@ -76,6 +76,7 @@ class FirebaseCollections {
   static const String logsDiarios = 'logs_diarios';
   static const String ajustes = 'ajustes';
   static const String configuracion = 'configuracion';
+  static const String pedidos = 'pedidos';
 }
 
 // Constantes de Campos en Firebase

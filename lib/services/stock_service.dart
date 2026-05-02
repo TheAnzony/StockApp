@@ -28,25 +28,14 @@ class StockService {
 
   static DocumentReference saboresRef() => _saboresRef;
 
-  static Future<void> addSabor(String nombre) =>
-      _saboresRef.set({nombre.trim(): 0}, SetOptions(merge: true));
+  static Future<void> addSabor(
+          String nombre, String marca, String formato, int cantidad) =>
+      _saboresRef.set({
+        nombre.trim(): {'marca': marca.trim(), 'formato': formato.trim(), 'cantidad': cantidad}
+      }, SetOptions(merge: true));
 
   static Future<void> deleteSabor(String nombre) =>
       _saboresRef.update({nombre: FieldValue.delete()});
-
-  static Future<void> initSaboresIfNeeded(Map<String, int> sabores) async {
-    final doc = await _saboresRef.get();
-    if (!doc.exists) {
-      await _saboresRef.set(sabores);
-    } else {
-      final existing = doc.data() as Map<String, dynamic>;
-      final nuevos = <String, dynamic>{};
-      sabores.forEach((k, v) {
-        if (!existing.containsKey(k)) nuevos[k] = v;
-      });
-      if (nuevos.isNotEmpty) await _saboresRef.update(nuevos);
-    }
-  }
 
   // ── Logs ───────────────────────────────────────────────────────────────────
 
@@ -91,6 +80,23 @@ class StockService {
       SetOptions(merge: true),
     );
   }
+
+  // ── Pedidos ────────────────────────────────────────────────────────────────
+
+  static Future<void> guardarPedido({
+    required List<Map<String, dynamic>> items,
+    required String operador,
+  }) =>
+      _db.collection(FirebaseCollections.pedidos).add({
+        'fecha': FieldValue.serverTimestamp(),
+        'operador': operador,
+        'items': items,
+      });
+
+  static Stream<QuerySnapshot> pedidosStream() => _db
+      .collection(FirebaseCollections.pedidos)
+      .orderBy('fecha', descending: true)
+      .snapshots();
 
   static Stream<QuerySnapshot> logsStream() =>
       _db

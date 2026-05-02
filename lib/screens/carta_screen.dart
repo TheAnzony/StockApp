@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../constants/carta_constants.dart';
+import '../models/sabor.dart';
 import '../services/stock_service.dart';
 import '../session.dart';
 
@@ -28,14 +29,78 @@ class _CartaScreenState extends State<CartaScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _init();
+  }
+
+  void _dialogoUsarSabor(String nombre, int stockActual) {
+    int cantidad = 1;
+    showDialog(
+      context: context,
+      builder: (c) => StatefulBuilder(
+        builder: (context, st) => AlertDialog(
+          title: Text(nombre),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Stock actual: $stockActual',
+                  style: const TextStyle(color: Colors.grey)),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.remove_circle_outline, size: 32),
+                    onPressed: cantidad > 1
+                        ? () => st(() => cantidad--)
+                        : null,
+                  ),
+                  const SizedBox(width: 12),
+                  Text('$cantidad',
+                      style: const TextStyle(
+                          fontSize: 32, fontWeight: FontWeight.bold)),
+                  const SizedBox(width: 12),
+                  IconButton(
+                    icon: const Icon(Icons.add_circle_outline,
+                        size: 32, color: Colors.blueAccent),
+                    onPressed: cantidad < stockActual
+                        ? () => st(() => cantidad++)
+                        : null,
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(c),
+              child: const Text('CANCELAR'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange),
+              onPressed: stockActual == 0
+                  ? null
+                  : () async {
+                      Navigator.pop(c);
+                      await StockService.saboresRef().update({
+                        '$nombre.cantidad': FieldValue.increment(-cantidad),
+                      });
+                    },
+              child: const Text('USAR',
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold, color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _guardarReajusteSabores(Map<String, dynamic> currentData) async {
     final Map<String, dynamic> updates = {};
     _tempReajusteSabores.forEach((k, v) {
-      final current = (currentData[k] as num?)?.toInt() ?? 0;
-      if (v != current) updates[k] = v;
+      final map = currentData[k] as Map<String, dynamic>? ?? {};
+      final current = (map['cantidad'] as num?)?.toInt() ?? 0;
+      if (v != current) updates['$k.cantidad'] = v;
     });
     if (updates.isNotEmpty) await StockService.saboresRef().update(updates);
     if (mounted) {
@@ -48,11 +113,6 @@ class _CartaScreenState extends State<CartaScreen>
             .showSnackBar(const SnackBar(content: Text('✅ Reajuste guardado')));
       }
     }
-  }
-
-  Future<void> _init() async {
-    final sabores = {for (var s in CartaConstants.saboresUnicos) s: 0};
-    await StockService.initSaboresIfNeeded(sabores); // usa articulos/sabores
   }
 
   @override
@@ -90,9 +150,10 @@ class _CartaScreenState extends State<CartaScreen>
                     setState(() {
                       _modoReajusteSabores = true;
                       _tempReajusteSabores.clear();
-                      for (final s in CartaConstants.saboresUnicos) {
-                        _tempReajusteSabores[s] =
-                            (current[s] as num?)?.toInt() ?? 0;
+                      for (final entry in current.entries) {
+                        final map = entry.value as Map<String, dynamic>? ?? {};
+                        _tempReajusteSabores[entry.key] =
+                            (map['cantidad'] as num?)?.toInt() ?? 0;
                       }
                     });
                   },
@@ -206,16 +267,27 @@ class _CartaScreenState extends State<CartaScreen>
             ? snap.data!.data() as Map<String, dynamic>
             : <String, dynamic>{};
 
-        final sabores = CartaConstants.saboresUnicos;
+        final sabores = data.entries
+            .map((e) => Sabor.fromEntry(e.key, e.value))
+            .toList()
+          ..sort((a, b) => a.nombre.compareTo(b.nombre));
 
         Widget listContent = ListView.builder(
           itemCount: sabores.length,
           itemBuilder: (context, index) {
-            final nombre = sabores[index];
-            final cantidad = (data[nombre] as num?)?.toInt() ?? 0;
+            final s = sabores[index];
+            final nombre = s.nombre;
+            final cantidad = s.cantidad;
             return ListTile(
+              onTap: _modoReajusteSabores
+                  ? null
+                  : () => _dialogoUsarSabor(nombre, cantidad),
               title: Text(nombre,
                   style: const TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: s.marca.isNotEmpty
+                  ? Text('${s.marca}  ·  ${s.formato}',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey))
+                  : null,
               trailing: _modoReajusteSabores
                   ? SizedBox(
                       width: 70,

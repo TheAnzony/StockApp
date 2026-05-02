@@ -345,8 +345,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         title: Text(user['nombre'],
                             style: const TextStyle(
                                 fontWeight: FontWeight.bold)),
-                        subtitle: Text(user['rol'].toString().toUpperCase(),
-                            style: TextStyle(color: color)),
                         onTap: () => _mostrarTeclado(context, user),
                       ),
                     );

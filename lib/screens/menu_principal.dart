@@ -14,6 +14,7 @@ import 'gestion_catalogo_screen.dart';
 import 'gestion_personal_screen.dart';
 import 'configuracion_screen.dart';
 import 'carta_screen.dart';
+import 'pedido_screen.dart';
 
 class MenuPrincipal extends StatefulWidget {
   const MenuPrincipal({super.key});
@@ -125,9 +126,12 @@ class _MenuPrincipalState extends State<MenuPrincipal> {
                     const RoturasScreen(), esEscritorio: esEscritorio),
                 _btn(context, 'PRESTADO', Icons.swap_horiz, Colors.orange,
                     const PrestadoScreen(), esEscritorio: esEscritorio),
-                if (isAdmin || esEncargado)
+                if (isAdmin || esEncargado) ...[
                   _btn(context, 'HISTORIALES', Icons.assignment,
                       Colors.purple, const SeleccionHistorialScreen(), esEscritorio: esEscritorio),
+                  _btn(context, 'PEDIDO', Icons.shopping_cart_checkout,
+                      Colors.deepOrange, const PedidoScreen(), esEscritorio: esEscritorio),
+                ],
                 if (isAdmin) ...[
                   _btn(context, 'CATÁLOGO', Icons.shopping_cart, Colors.amber,
                       const GestionCatalogoScreen(), esEscritorio: esEscritorio),
