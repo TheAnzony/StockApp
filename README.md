@@ -1,12 +1,22 @@
 # Stock Disco Pro
 
-**Versión actual: 2.1.0**
+**Versión actual: 2.1.1**
 
 Aplicación móvil y web para la gestión de stock de cachimbas en una discoteca. Permite controlar el inventario en tiempo real, registrar entradas, roturas y préstamos, gestionar sabores con marca y formato, generar pedidos inteligentes y consultar el historial de movimientos por categoría.
 
 ---
 
 ## Historial de versiones
+
+### v2.1.1 — Prioridad alta automática para stock en 0
+
+#### PEDIDO — reglas de prioridad
+- Cualquier ítem (artículo o sabor) con cantidad **0** se muestra siempre como prioridad **alta**, independientemente de su formato o regla base:
+  - Artículos: BASES, CACHIMBAS, MANGUERAS y HORNILLOS escalan a alta si llegan a 0
+  - Sabores: cualquier sabor a 0 unidades es alta sin importar si es 50gr, 100gr o 200gr
+- La lista de sugerencias se ordena de mayor a menor prioridad: 🔴 alta → 🟠 media → 🟡 baja → ⚪ manual
+
+---
 
 ### v2.1.0 — Gestión de sabores mejorada + Pantalla de Pedido
 

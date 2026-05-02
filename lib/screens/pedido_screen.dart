@@ -65,7 +65,7 @@ class _PedidoScreenState extends State<PedidoScreen> {
     final liquidoBases = _get(art, 'liquido bases');
     final hornillos   = _get(art, 'hornillos');
 
-    // CAZOLETAS
+    // CAZOLETAS (0 ya queda cubierto por < 50 → alta)
     if (cazoletas < 50) {
       lista.add(ItemPedido(nombre: 'CAZOLETAS', esSabor: false, prioridad: PrioridadPedido.alta));
     } else if (cazoletas < cachimbas - 15) {
@@ -73,11 +73,11 @@ class _PedidoScreenState extends State<PedidoScreen> {
     }
 
     // BASES
-    if (mastil > bases) {
+    if (bases == 0 || mastil > bases) {
       lista.add(ItemPedido(
         nombre: 'BASES',
         esSabor: false,
-        prioridad: mastil > 5 ? PrioridadPedido.alta : PrioridadPedido.media,
+        prioridad: (bases == 0 || mastil > 5) ? PrioridadPedido.alta : PrioridadPedido.media,
       ));
     }
 
@@ -90,7 +90,7 @@ class _PedidoScreenState extends State<PedidoScreen> {
 
     // CACHIMBAS
     final totalCachimbas = cachimbas + mastil;
-    if (totalCachimbas < 40) {
+    if (cachimbas == 0 || totalCachimbas < 40) {
       lista.add(ItemPedido(nombre: 'CACHIMBAS', esSabor: false, prioridad: PrioridadPedido.alta));
     } else if (totalCachimbas <= 50) {
       lista.add(ItemPedido(nombre: 'CACHIMBAS', esSabor: false, prioridad: PrioridadPedido.media));
@@ -98,14 +98,16 @@ class _PedidoScreenState extends State<PedidoScreen> {
 
     // MANGUERAS (diferencia con cachimbas)
     final diffMangueras = cachimbas - mangueras;
-    if (diffMangueras >= 10) {
+    if (mangueras == 0 || diffMangueras >= 10) {
       lista.add(ItemPedido(nombre: 'MANGUERAS', esSabor: false, prioridad: PrioridadPedido.alta));
     } else if (diffMangueras > 0) {
       lista.add(ItemPedido(nombre: 'MANGUERAS', esSabor: false, prioridad: PrioridadPedido.media));
     }
 
     // HORNILLOS
-    if (hornillos <= 2) {
+    if (hornillos == 0) {
+      lista.add(ItemPedido(nombre: 'HORNILLOS', esSabor: false, prioridad: PrioridadPedido.alta));
+    } else if (hornillos <= 2) {
       lista.add(ItemPedido(nombre: 'HORNILLOS', esSabor: false, prioridad: PrioridadPedido.media));
     }
 
@@ -114,10 +116,10 @@ class _PedidoScreenState extends State<PedidoScreen> {
       final s = Sabor.fromEntry(entry.key, entry.value);
       PrioridadPedido? prioridad;
 
-      if (s.formato == '50gr') {
-        if (s.cantidad == 0) {
-          prioridad = PrioridadPedido.alta;
-        } else if (s.cantidad < 10) {
+      if (s.cantidad == 0) {
+        prioridad = PrioridadPedido.alta;
+      } else if (s.formato == '50gr') {
+        if (s.cantidad < 10) {
           prioridad = PrioridadPedido.media;
         } else if (s.cantidad < 20) {
           prioridad = PrioridadPedido.baja;
