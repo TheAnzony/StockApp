@@ -57,25 +57,34 @@ class StockService {
     );
   }
 
+  static Future<DocumentSnapshot?> getUltimoStock() async {
+    final currentId = _fechaId();
+    final q = await _db
+        .collection(FirebaseCollections.logsDiarios)
+        .orderBy(FirebaseFields.timestamp, descending: true)
+        .limit(60)
+        .get();
+    for (final doc in q.docs) {
+      if (doc.id == currentId) continue;
+      final data = doc.data() as Map<String, dynamic>? ?? {};
+      if (data.containsKey(FirebaseFields.stockFinal)) return doc;
+    }
+    return null;
+  }
+
   static Future<void> guardarStock({
+    required Map<String, int> stockAnterior,
     required Map<String, int> stockFinal,
-    required Map<String, int> fugasRoturas,
-    required Map<String, int> fugasPrestados,
-    required Map<String, int> fugasDesconocido,
-    required List<Map<String, dynamic>> movimientos,
+    String? stockAnteriorId,
   }) async {
     final id = _fechaId();
     await _db.collection(FirebaseCollections.logsDiarios).doc(id).set(
       {
         FirebaseFields.fechaId: id,
         FirebaseFields.timestamp: FieldValue.serverTimestamp(),
-        FirebaseFields.movimientos: FieldValue.arrayUnion(movimientos),
+        FirebaseFields.stockAnterior: stockAnterior,
         FirebaseFields.stockFinal: stockFinal,
-        FirebaseFields.fugas: {
-          'roturas': fugasRoturas,
-          'prestados': fugasPrestados,
-          'desconocido': fugasDesconocido,
-        },
+        FirebaseFields.stockAnteriorId: stockAnteriorId ?? '',
       },
       SetOptions(merge: true),
     );

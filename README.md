@@ -302,7 +302,7 @@ Un documento por pedido confirmado (ID auto-generado):
 
 ### Web
 ```bash
-flutter build web --release
+flutter build web --release --pwa-strategy=none
 firebase deploy --only hosting --project stock-cachimbas
 ```
 

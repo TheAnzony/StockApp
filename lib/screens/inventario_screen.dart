@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../constants/constants.dart';
 import '../session.dart';
 import '../services/stock_service.dart';
 import '../services/session_service.dart';
@@ -56,186 +57,98 @@ class _InventarioScreenState extends State<InventarioScreen> {
   }
 
   void _confirmarGuardar(DocumentReference ref, Map<String, dynamic> currentDB) {
-    // Artículos con diferencia respecto al DB actual
-    final List<String> conDiferencia = [];
-    final List<String> aSetearCero = [];
-    final Map<String, String> razones = {};
-
+    final List<MapEntry<String, int>> cambios = [];
     temp.forEach((k, vContado) {
       if (currentDB[k] is! num) return;
       final int vAnterior = (currentDB[k] as num).toInt();
-      final int diff = vContado - vAnterior;
-      if (diff == 0) return;
-      conDiferencia.add(k);
-      if (vContado == 0) aSetearCero.add(k);
-      razones[k] = diff < 0 ? 'DESCUADRE' : 'RECIBIDO';
+      if (vContado != vAnterior) cambios.add(MapEntry(k, vContado));
     });
 
     showDialog(
       context: context,
-      builder: (c) => StatefulBuilder(
-        builder: (context, setSt) => AlertDialog(
-          title: const Text("Confirmar Stock"),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (aSetearCero.isNotEmpty) ...[
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.red.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.red),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          "⚠️ Los siguientes artículos se actualizarán a 0:",
-                          style: TextStyle(
-                              color: Colors.red, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 6),
-                        ...aSetearCero.map((k) => Text(
-                              "• ${k.toUpperCase()}",
-                              style: const TextStyle(color: Colors.redAccent),
-                            )),
-                        const SizedBox(height: 6),
-                        const Text(
-                          "¿Confirmas que no hay stock de estos artículos?",
-                          style: TextStyle(color: Colors.red, fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-                if (conDiferencia.isNotEmpty) ...[
-                  const Text(
-                    "Indica el motivo de cada diferencia:",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 10),
-                  ...conDiferencia.map((k) {
-                    final int vAnterior = (currentDB[k] as num).toInt();
-                    final int diff = temp[k]! - vAnterior;
-                    final bool esNegativo = diff < 0;
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 14),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(children: [
-                            Expanded(
-                              child: Text(
-                                k.toUpperCase(),
-                                style: const TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                            Text(
-                              "$vAnterior → ${temp[k]}  (${diff > 0 ? '+' : ''}$diff)",
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: esNegativo ? Colors.red : Colors.green,
-                              ),
-                            ),
-                          ]),
-                          const SizedBox(height: 4),
-                          DropdownButtonFormField<String>(
-                            value: razones[k],
-                            decoration: const InputDecoration(
-                              isDense: true,
-                              border: OutlineInputBorder(),
-                              contentPadding: EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 8),
-                            ),
-                            items: (esNegativo
-                                    ? ['DESCUADRE', 'ROTURAS', 'PRESTADO']
-                                    : ['RECIBIDO', 'AJUSTE'])
-                                .map((r) =>
-                                    DropdownMenuItem(value: r, child: Text(r)))
-                                .toList(),
-                            onChanged: (v) => setSt(() => razones[k] = v!),
+      builder: (c) => AlertDialog(
+        title: const Text("Confirmar Stock"),
+        content: cambios.isEmpty
+            ? const Text("No hay cambios que guardar.")
+            : SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("Cambios detectados:",
+                        style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 10),
+                    ...cambios.map((e) {
+                      final int vAnterior = (currentDB[e.key] as num).toInt();
+                      final int diff = e.value - vAnterior;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Row(children: [
+                          Expanded(
+                            child: Text(e.key.toUpperCase(),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold)),
                           ),
-                        ],
-                      ),
-                    );
-                  }),
-                ],
-                if (conDiferencia.isEmpty)
-                  const Text("No hay cambios que guardar."),
-              ],
-            ),
+                          Text(
+                            "$vAnterior → ${e.value}  (${diff > 0 ? '+' : ''}$diff)",
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: diff < 0 ? Colors.redAccent : Colors.green,
+                            ),
+                          ),
+                        ]),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(c),
+              child: const Text("CANCELAR")),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00ACC1)),
+            onPressed: cambios.isEmpty
+                ? null
+                : () {
+                    Navigator.pop(c);
+                    _save(ref, currentDB);
+                  },
+            child: const Text("SÍ, CONFIRMAR",
+                style: TextStyle(
+                    fontWeight: FontWeight.bold, color: Colors.white)),
           ),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(c),
-                child: const Text("CANCELAR")),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00ACC1)),
-              onPressed: conDiferencia.isEmpty
-                  ? null
-                  : () {
-                      Navigator.pop(c);
-                      _save(ref, currentDB, razones);
-                    },
-              child: const Text("SÍ, CONFIRMAR",
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold, color: Colors.white)),
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }
 
-  void _save(DocumentReference ref, Map<String, dynamic> currentStockDB,
-      Map<String, String> razones) async {
-    List<Map<String, dynamic>> logs = [];
-    Map<String, int> stockFinal = {};
-    Map<String, int> fugasRoturas = {};
-    Map<String, int> fugasPrestados = {};
-    Map<String, int> fugasDesconocido = {};
-    Map<String, dynamic> updates = {};
+  Future<void> _save(
+      DocumentReference ref, Map<String, dynamic> currentStockDB) async {
+    final Map<String, int> stockFinal = {};
+    final Map<String, dynamic> updates = {};
 
     temp.forEach((k, vContado) {
       if (currentStockDB[k] is! num) return;
-      final int vAnterior = (currentStockDB[k] as num).toInt();
-      final int diferencia = vContado - vAnterior;
-      if (diferencia == 0) return;
-
-      final String razon = razones[k] ?? (diferencia < 0 ? 'DESCUADRE' : 'RECIBIDO');
-
-      logs.add({
-        'articulo': k.toUpperCase(),
-        'cantidad': diferencia,
-        'fecha': DateTime.now(),
-        'motivo': razon,
-        'operador': usuarioActual?['nombre'],
-      });
-
-      if (razon == 'ROTURAS') {
-        fugasRoturas[k] = diferencia;
-      } else if (razon == 'PRESTADO') {
-        fugasPrestados[k] = diferencia;
-      } else if (razon == 'DESCUADRE') {
-        fugasDesconocido[k] = diferencia;
-      }
-
       stockFinal[k] = vContado;
-      updates[k] = vContado;
+      final int vAnterior = (currentStockDB[k] as num).toInt();
+      if (vContado != vAnterior) updates[k] = vContado;
     });
 
+    // Buscar el stock_final del último stock realizado para usarlo como base
+    final ultimoDoc = await StockService.getUltimoStock();
+    final Map<String, int> stockAnterior = {};
+    if (ultimoDoc != null) {
+      final data = ultimoDoc.data() as Map<String, dynamic>? ?? {};
+      final sf = data[FirebaseFields.stockFinal] as Map<String, dynamic>? ?? {};
+      sf.forEach((k, v) => stockAnterior[k] = (v as num).toInt());
+    }
+
     await StockService.guardarStock(
+      stockAnterior: stockAnterior,
       stockFinal: stockFinal,
-      fugasRoturas: fugasRoturas,
-      fugasPrestados: fugasPrestados,
-      fugasDesconocido: fugasDesconocido,
-      movimientos: logs,
+      stockAnteriorId: ultimoDoc?.id,
     );
     if (updates.isNotEmpty) await ref.update(updates);
 

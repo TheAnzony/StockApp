@@ -220,241 +220,258 @@ class _HistorialFiltradoScreenState extends State<HistorialFiltradoScreen> {
     final data = d.data() as Map<String, dynamic>;
     final List totalMovs = data['movimientos'] as List? ?? [];
 
-    final movsRoturas =
-        totalMovs.where((m) => m['motivo'] == 'ROTURAS').toList();
-    final movsAltas =
-        totalMovs.where((m) => m['motivo'] == 'ALTA').toList();
-    final movsLogisticos = totalMovs
-        .where((m) =>
-            m['motivo'] == 'RECIBIDO' || m['motivo'] == 'PRESTADO')
-        .toList();
-
-    final Map<String, dynamic> fugasRaw = data['fugas'] ?? {};
-    Map<String, int> fugasRoturas = {};
-    Map<String, int> fugasPrestados = {};
-    Map<String, int> fugasDesconocido = {};
-
-    if (fugasRaw.containsKey('roturas') ||
-        fugasRaw.containsKey('prestados') ||
-        fugasRaw.containsKey('desconocido')) {
-      (fugasRaw['roturas'] as Map? ?? {})
-          .forEach((k, v) => fugasRoturas[k] = (v as num).toInt());
-      (fugasRaw['prestados'] as Map? ?? {})
-          .forEach((k, v) => fugasPrestados[k] = (v as num).toInt());
-      (fugasRaw['desconocido'] as Map? ?? {})
-          .forEach((k, v) => fugasDesconocido[k] = (v as num).toInt());
-    } else {
-      fugasRaw.forEach(
-          (k, v) => fugasDesconocido[k] = (v as num).toInt());
+    if (widget.filtro == 'GENERAL') {
+      return _buildGeneralCard(d.id, data, totalMovs);
     }
 
-    final bool hayFugas = fugasRoturas.isNotEmpty ||
-        fugasPrestados.isNotEmpty ||
-        fugasDesconocido.isNotEmpty;
-
+    // Otros historiales (RECIBIDO, ROTURAS, PRESTADO)
+    final movsFiltrados =
+        totalMovs.where((m) => m['motivo'] == widget.filtro).toList();
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: ExpansionTile(
         title: Text("Día: ${_formatFecha(d.id)}"),
+        children: movsFiltrados.map((m) {
+          final DateTime dt = (m['fecha'] as Timestamp).toDate();
+          return ListTile(
+            title: Text(
+                "${m['articulo']} (${m['cantidad'] > 0 ? "+" : ""}${m['cantidad']})"),
+            subtitle: Text(
+                "Por: ${m['operador'] ?? '-'} | ${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')} - ${dt.hour}:${dt.minute.toString().padLeft(2, '0')} ${m['concepto'] ?? m['destino'] ?? ''}"),
+            trailing: isAdmin
+                ? IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.redAccent),
+                    onPressed: () async {
+                      await d.reference.update({
+                        'movimientos': FieldValue.arrayRemove([m])
+                      });
+                    },
+                  )
+                : null,
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  List<MapEntry<String, int>> _calcularDescuadres(
+      Map<String, dynamic> stockAnterior, Map<String, dynamic> stockFinal) {
+    final descuadres = <MapEntry<String, int>>[];
+    stockAnterior.forEach((k, v) {
+      final int vAnterior = (v as num).toInt();
+      final int vFinal = (stockFinal[k] as num?)?.toInt() ?? vAnterior;
+      if (vFinal != vAnterior) descuadres.add(MapEntry(k, vFinal - vAnterior));
+    });
+    return descuadres;
+  }
+
+  Widget _buildDescuadreSection(
+      Map<String, dynamic> stockAnterior,
+      Map<String, dynamic> stockFinal,
+      String? anteriorId) {
+    // Si tenemos stock_anterior directo, calcular sin async
+    if (stockAnterior.isNotEmpty) {
+      return _descuadreWidget(_calcularDescuadres(stockAnterior, stockFinal));
+    }
+    // Si hay referencia al doc anterior, buscarlo
+    if (anteriorId != null && anteriorId.isNotEmpty) {
+      return FutureBuilder<DocumentSnapshot>(
+        future: FirebaseFirestore.instance
+            .collection('logs_diarios')
+            .doc(anteriorId)
+            .get(),
+        builder: (context, snap) {
+          if (!snap.hasData) {
+            return const Padding(
+              padding: EdgeInsets.all(12),
+              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            );
+          }
+          final anteriorData =
+              snap.data!.data() as Map<String, dynamic>? ?? {};
+          final sfAnterior =
+              anteriorData['stock_final'] as Map<String, dynamic>? ?? {};
+          return _descuadreWidget(_calcularDescuadres(sfAnterior, stockFinal));
+        },
+      );
+    }
+    return _descuadreWidget([]);
+  }
+
+  Widget _descuadreWidget(List<MapEntry<String, int>> descuadres) {
+    if (descuadres.isEmpty) {
+      return const ListTile(
+        dense: true,
+        title: Text("Sin descuadre",
+            style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey)),
+      );
+    }
+    return Column(
+      children: descuadres.map((e) {
+        final bool negativo = e.value < 0;
+        return ListTile(
+          dense: true,
+          title: Text(e.key.toUpperCase(),
+              style: const TextStyle(fontWeight: FontWeight.bold)),
+          trailing: Text(
+            "${e.value > 0 ? '+' : ''}${e.value}",
+            style: TextStyle(
+                color: negativo ? Colors.redAccent : Colors.green,
+                fontWeight: FontWeight.bold,
+                fontSize: 15),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildGeneralCard(
+      String docId, Map<String, dynamic> data, List totalMovs) {
+    final stockAnterior =
+        (data['stock_anterior'] as Map<String, dynamic>?) ?? {};
+    final stockFinal =
+        (data['stock_final'] as Map<String, dynamic>?) ?? {};
+    final anteriorId = data['stock_anterior_id'] as String?;
+
+    // Stock realizado = stock_final (contiene todos los artículos contados)
+    final Map<String, int> stockRealizado = {};
+    stockFinal.forEach((k, v) => stockRealizado[k] = (v as num).toInt());
+
+    final movsRoturas =
+        totalMovs.where((m) => m['motivo'] == 'ROTURAS').toList();
+    final movsRecibidos =
+        totalMovs.where((m) => m['motivo'] == 'RECIBIDO').toList();
+    final movsPrestados =
+        totalMovs.where((m) => m['motivo'] == 'PRESTADO').toList();
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: ExpansionTile(
+        title: Text("Día: ${_formatFecha(docId)}"),
         children: [
-          if (widget.filtro == 'GENERAL' &&
-              data.containsKey('stock_final')) ...[
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8.0),
-              child: Text("📊 STOCK FINAL DEL DÍA",
+          // ── STOCK REALIZADO ───────────────────────────────────────
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: Text("STOCK REALIZADO",
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.cyan,
+                    letterSpacing: 1.2)),
+          ),
+          if (stockRealizado.isEmpty)
+            const ListTile(
+              dense: true,
+              title: Text("Sin datos de stock",
                   style: TextStyle(
-                      fontWeight: FontWeight.bold, color: Colors.cyan)),
-            ),
-            ...(data['stock_final'] as Map<String, dynamic>)
-                .entries
-                .map((entry) => ListTile(
+                      fontStyle: FontStyle.italic, color: Colors.grey)),
+            )
+          else
+            ...(stockRealizado.entries.toList()
+                  ..sort((a, b) => a.key.compareTo(b.key)))
+                .map((e) => ListTile(
                       dense: true,
-                      title: Text(entry.key.toUpperCase()),
-                      trailing: Text("${entry.value}",
+                      title: Text(e.key.toUpperCase(),
+                          style:
+                              const TextStyle(fontWeight: FontWeight.bold)),
+                      trailing: Text("${e.value}",
                           style: const TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 16)),
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.cyan)),
                     )),
-            if (movsAltas.isNotEmpty) ...[
-              const Divider(color: Colors.blueAccent),
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 4.0),
-                child: Text("🆕 ARTÍCULOS NUEVOS",
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blueAccent)),
-              ),
-              ...movsAltas.map((m) => ListTile(
-                    dense: true,
-                    leading:
-                        const Icon(Icons.star, color: Colors.blueAccent),
-                    title: Text(m['articulo']),
-                  )),
-            ],
-            const Divider(color: Colors.white54),
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8.0),
-              child: Text("⚠️ ROTURAS",
+
+          const Divider(),
+
+          // ── DESCUADRE ─────────────────────────────────────────────
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 4, 16, 4),
+            child: Text("DESCUADRE",
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.redAccent,
+                    letterSpacing: 1.2)),
+          ),
+          _buildDescuadreSection(stockAnterior, stockFinal, anteriorId),
+
+          const Divider(),
+
+          // ── ROTURAS ───────────────────────────────────────────────
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 4, 16, 4),
+            child: Text("ROTURAS",
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.orangeAccent,
+                    letterSpacing: 1.2)),
+          ),
+          if (movsRoturas.isEmpty)
+            const ListTile(
+              dense: true,
+              title: Text("Sin roturas",
                   style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.orangeAccent)),
-            ),
-            if (movsRoturas.isEmpty)
-              const ListTile(
-                title: Text("Sin roturas registradas",
-                    style: TextStyle(
-                        fontStyle: FontStyle.italic, color: Colors.grey)),
-              ),
+                      fontStyle: FontStyle.italic, color: Colors.grey)),
+            )
+          else
             ...movsRoturas.map((m) => ListTile(
                   dense: true,
-                  title: Text("${m['articulo']} (${m['cantidad']})"),
-                  subtitle: Text("${m['operador']}"),
+                  title: Text(
+                      "${m['articulo']} (${m['cantidad']})"),
+                  subtitle: Text("${m['operador'] ?? '-'}"),
                 )),
-            const Divider(thickness: 2),
-            if (!hayFugas)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 12.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.check_circle, color: Colors.green, size: 20),
-                    SizedBox(width: 10),
-                    Text("NO HAY DESCUADRE",
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.green)),
-                  ],
-                ),
-              )
-            else ...[
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.warning_amber_rounded,
-                        color: Colors.redAccent, size: 20),
-                    SizedBox(width: 10),
-                    Text("DESCUADRES",
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.redAccent)),
-                  ],
-                ),
-              ),
-              if (fugasRoturas.isNotEmpty) ...[
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
-                  child: Text("🔧 POR ROTURA",
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.orangeAccent)),
-                ),
-                ...fugasRoturas.entries.map((e) => ListTile(
-                      dense: true,
-                      title: Text(e.key.toUpperCase(),
-                          style:
-                              const TextStyle(color: Colors.orangeAccent)),
-                      trailing: Text("${e.value}",
-                          style: const TextStyle(
-                              color: Colors.orangeAccent,
-                              fontWeight: FontWeight.bold)),
-                      subtitle: Text(
-                          "Faltan ${e.value.abs()} unidades por rotura."),
-                    )),
-              ],
-              if (fugasPrestados.isNotEmpty) ...[
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
-                  child: Text("🔄 POR PRESTADO",
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blueAccent)),
-                ),
-                ...fugasPrestados.entries.map((e) => ListTile(
-                      dense: true,
-                      title: Text(e.key.toUpperCase(),
-                          style:
-                              const TextStyle(color: Colors.blueAccent)),
-                      trailing: Text("${e.value}",
-                          style: const TextStyle(
-                              color: Colors.blueAccent,
-                              fontWeight: FontWeight.bold)),
-                      subtitle: Text(
-                          "Faltan ${e.value.abs()} unidades por préstamo."),
-                    )),
-              ],
-              if (fugasDesconocido.isNotEmpty) ...[
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
-                  child: Text("❓ DESCONOCIDO",
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.redAccent)),
-                ),
-                ...fugasDesconocido.entries.map((e) => ListTile(
-                      dense: true,
-                      title: Text(e.key.toUpperCase(),
-                          style:
-                              const TextStyle(color: Colors.redAccent)),
-                      trailing: Text(
-                          e.value < 0 ? "${e.value}" : "+${e.value}",
-                          style: const TextStyle(
-                              color: Colors.redAccent,
-                              fontWeight: FontWeight.bold)),
-                      subtitle: Text(e.value < 0
-                          ? "Faltan ${e.value.abs()} unidades sin motivo conocido."
-                          : "Sobran ${e.value.abs()} unidades sin motivo conocido."),
-                    )),
-              ],
-            ],
-            const Divider(),
-            ExpansionTile(
-              title: const Text("📦 MOVIMIENTOS LOGÍSTICOS",
-                  style:
-                      TextStyle(fontSize: 13, color: Colors.blueGrey)),
-              children: movsLogisticos
-                  .map((m) => ListTile(
-                        dense: true,
-                        leading: Icon(
-                            m['motivo'] == 'RECIBIDO'
-                                ? Icons.download
-                                : Icons.upload,
-                            color: m['motivo'] == 'RECIBIDO'
-                                ? Colors.green
-                                : Colors.orange,
-                            size: 18),
-                        title: Text(
-                            "${m['articulo']} (${m['cantidad'] > 0 ? "+" : ""}${m['cantidad']})"),
-                        subtitle: Text(
-                            "${m['motivo']} ${m['destino'] ?? m['concepto'] ?? ''}"),
-                      ))
-                  .toList(),
-            ),
-          ],
-          if (widget.filtro != 'GENERAL')
-            ...totalMovs
-                .where((m) => m['motivo'] == widget.filtro)
-                .map((m) {
-              final DateTime dt =
-                  (m['fecha'] as Timestamp).toDate();
-              return ListTile(
-                title: Text(
-                    "${m['articulo']} (${m['cantidad'] > 0 ? "+" : ""}${m['cantidad']})"),
-                subtitle: Text(
-                    "Por: ${m['operador'] ?? '-'} | ${dt.day.toString().padLeft(2,'0')}/${dt.month.toString().padLeft(2,'0')} - ${dt.hour}:${dt.minute.toString().padLeft(2, '0')} ${m['concepto'] ?? m['destino'] ?? ''}"),
-                trailing: isAdmin
-                    ? IconButton(
-                        icon: const Icon(Icons.delete,
-                            color: Colors.redAccent),
-                        onPressed: () async {
-                          await d.reference.update({
-                            'movimientos': FieldValue.arrayRemove([m])
-                          });
-                        },
-                      )
-                    : null,
-              );
-            }),
+
+          const Divider(),
+
+          // ── RECIBIDOS ─────────────────────────────────────────────
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 4, 16, 4),
+            child: Text("RECIBIDOS",
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green,
+                    letterSpacing: 1.2)),
+          ),
+          if (movsRecibidos.isEmpty)
+            const ListTile(
+              dense: true,
+              title: Text("Sin recibidos",
+                  style: TextStyle(
+                      fontStyle: FontStyle.italic, color: Colors.grey)),
+            )
+          else
+            ...movsRecibidos.map((m) => ListTile(
+                  dense: true,
+                  title: Text(
+                      "${m['articulo']} (+${m['cantidad']})"),
+                  subtitle: Text(
+                      "${m['operador'] ?? '-'}  ${m['concepto'] != null ? '· ${m['concepto']}' : ''}"),
+                )),
+
+          const Divider(),
+
+          // ── PRESTADOS ─────────────────────────────────────────────
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 4, 16, 16),
+            child: Text("PRESTADOS",
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blueAccent,
+                    letterSpacing: 1.2)),
+          ),
+          if (movsPrestados.isEmpty)
+            const ListTile(
+              dense: true,
+              title: Text("Sin prestados",
+                  style: TextStyle(
+                      fontStyle: FontStyle.italic, color: Colors.grey)),
+            )
+          else
+            ...movsPrestados.map((m) => ListTile(
+                  dense: true,
+                  title: Text(
+                      "${m['articulo']} (${m['cantidad']})"),
+                  subtitle: Text(
+                      "${m['operador'] ?? '-'}  ${m['destino'] != null ? '· ${m['destino']}' : ''}"),
+                )),
         ],
       ),
     );

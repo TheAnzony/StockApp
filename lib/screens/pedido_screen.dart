@@ -31,6 +31,8 @@ class _PedidoScreenState extends State<PedidoScreen> {
   final List<ItemPedido> _manuales = [];
   Map<String, dynamic> _articulosCache = {};
   Map<String, dynamic> _saboresCache = {};
+  // Persiste las cantidades introducidas entre rebuilds del stream
+  final Map<String, int> _cantidades = {};
 
   // Case-insensitive lookup normalizando acentos
   int _get(Map<String, dynamic> data, String key) {
@@ -189,8 +191,13 @@ class _PedidoScreenState extends State<PedidoScreen> {
       context: context,
       builder: (c) => AlertDialog(
         title: const Text('Confirmar pedido'),
-        content: Text(
-            '¿Guardar este pedido con ${todos.length} artículo${todos.length == 1 ? '' : 's'}?'),
+        content: Builder(builder: (context) {
+          final conCantidad =
+              todos.where((i) => (_cantidades[i.nombre] ?? 0) > 0).length;
+          return Text(conCantidad == 0
+              ? 'No hay artículos con cantidad mayor a 0.'
+              : '¿Guardar este pedido con $conCantidad artículo${conCantidad == 1 ? '' : 's'}?');
+        }),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(c, false),
@@ -206,20 +213,34 @@ class _PedidoScreenState extends State<PedidoScreen> {
     );
     if (ok != true || !mounted) return;
 
+    final itemsAGuardar = todos
+        .where((i) => (_cantidades[i.nombre] ?? 0) > 0)
+        .map((i) => {
+              'nombre': i.nombre,
+              'esSabor': i.esSabor,
+              'prioridad': i.prioridad.name,
+              'cantidad': _cantidades[i.nombre]!,
+            })
+        .toList();
+
+    if (itemsAGuardar.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Añade cantidades antes de confirmar')));
+      }
+      return;
+    }
+
     await StockService.guardarPedido(
       operador: usuarioActual?['nombre'] ?? '?',
-      items: todos
-          .map((i) => {
-                'nombre': i.nombre,
-                'esSabor': i.esSabor,
-                'prioridad': i.prioridad.name,
-                'cantidad': i.cantidad,
-              })
-          .toList(),
+      items: itemsAGuardar,
     );
 
     if (mounted) {
-      setState(() => _manuales.clear());
+      setState(() {
+        _manuales.clear();
+        _cantidades.clear();
+      });
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('✅ Pedido guardado en historial')));
     }
@@ -274,14 +295,15 @@ class _PedidoScreenState extends State<PedidoScreen> {
                       width: 62,
                       child: TextFormField(
                         key: Key('ped_${item.nombre}'),
-                        initialValue: '${item.cantidad}',
+                        initialValue: '${_cantidades[item.nombre] ?? 0}',
                         keyboardType: TextInputType.number,
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                             fontSize: 18, fontWeight: FontWeight.bold),
                         decoration: const InputDecoration(
                             isDense: true, border: OutlineInputBorder()),
-                        onChanged: (v) => item.cantidad = int.tryParse(v) ?? 0,
+                        onChanged: (v) =>
+                            _cantidades[item.nombre] = int.tryParse(v) ?? 0,
                       ),
                     ),
                     if (esManual) ...[

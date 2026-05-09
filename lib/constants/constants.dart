@@ -89,8 +89,9 @@ class FirebaseFields {
   static const String fechaId = 'fecha_id';
   static const String timestamp = 'timestamp';
   static const String movimientos = 'movimientos';
+  static const String stockAnterior = 'stock_anterior';
+  static const String stockAnteriorId = 'stock_anterior_id';
   static const String stockFinal = 'stock_final';
-  static const String fugas = 'fugas';
   static const String articulo = 'articulo';
   static const String cantidad = 'cantidad';
   static const String fecha = 'fecha';
