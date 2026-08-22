@@ -1,12 +1,27 @@
 # Stock Disco Pro
 
-**Versión actual: 2.2.0**
+**Versión actual: 2.3.0**
 
 Aplicación móvil y web para la gestión de stock de cachimbas en una discoteca. Permite controlar el inventario en tiempo real, registrar entradas, roturas y préstamos, gestionar sabores con marca y formato, generar pedidos y consultar el historial de movimientos por categoría.
 
 ---
 
 ## Historial de versiones
+
+### v2.3.0 — Mezclas editables en Carta y edición de pedidos del día
+
+#### CARTA — mezclas movidas a Firestore
+- Las recetas de MEZCLAS ya no están hardcodeadas en el código; viven en el documento `articulos/mezclas`
+- Admin puede **crear, editar y eliminar mezclas** desde la propia app (botón NUEVA MEZCLA + lápiz/papelera por receta), seleccionando sabores del catálogo y su porcentaje
+- Validaciones al guardar: nombre no vacío ni duplicado, al menos un sabor, cada sabor con porcentaje > 0, y los porcentajes deben sumar exactamente 100%
+- **Corregido el bug reportado**: renombrar un sabor desde Catálogo ahora actualiza en cascada su nombre en cualquier mezcla que lo use, en la misma escritura atómica — antes había que editar el código a mano y redesplegar
+- Migración única (`migrate_mezclas.js`) para llevar las 8 recetas existentes a Firestore, limpiando los sufijos "(Marca)" del nombre de los ingredientes para que coincidan exactamente con las claves de `articulos/sabores`
+
+#### PEDIDO — edición de pedidos ya confirmados
+- En el historial de PEDIDOS aparece un botón de editar (lápiz) junto a la fecha, solo si el usuario es **admin** y el pedido es **del día actual**
+- Abre la pantalla de PEDIDO precargada con las cantidades ya guardadas; al confirmar, actualiza el `items` del pedido existente en vez de crear uno nuevo
+
+---
 
 ### v2.2.0 — Rework de Pedido, Recibir, Prestado, Roturas y Catálogo
 
@@ -186,7 +201,8 @@ Aplicación móvil y web para la gestión de stock de cachimbas en una discoteca
 - Lista con todos los artículos del stock y su stock actual; la cantidad a prestar no puede superar el stock disponible. Las mangueras deben registrarse manualmente si se prestan junto con las cachimbas (ya no se descuentan solas).
 
 ### Carta
-- **MEZCLAS**: recetas con ingredientes, porcentajes y barra visual de color.
+- **MEZCLAS**: recetas con ingredientes, porcentajes y barra visual de color, leídas en tiempo real desde `articulos/mezclas`. Admin puede crear, editar y eliminar mezclas (botón NUEVA MEZCLA + lápiz/papelera por receta); al guardar se valida que los porcentajes sumen 100% y que cada sabor tenga más de 0%.
+- Si se renombra un sabor desde Catálogo, cualquier mezcla que lo use se actualiza automáticamente (ya no hace falta editar código).
 - **SABORES**: stock en tiempo real con marca y formato; botón USAR para todos los roles; reajuste directo para admin.
 
 ### Pedido _(admin / encargado)_
@@ -244,7 +260,6 @@ Cinco categorías, todas con meses colapsables y filtro por año:
 lib/
   constants/
     constants.dart                   # Constantes Firebase, artículos y roles
-    carta_constants.dart             # Recetas y lista de sabores de la carta
   models/
     sabor.dart                       # Modelo Sabor (nombre, marca, formato, cantidad)
     articulo.dart                    # Modelo de artículo de stock
@@ -290,6 +305,19 @@ Documento único con sabores como mapa anidado:
   "Magic Love":   { "marca": "Alfaker", "formato": "200gr", "cantidad": 28 },
   "Happy hound":  { "marca": "SK",      "formato": "50gr",  "cantidad": 11 },
   "Yellow":       { "marca": "Alfaker", "formato": "200gr", "cantidad": 10 }
+}
+```
+
+### `articulos/mezclas`
+Documento único con un array `recetas` (el orden del array define el orden de visualización en la Carta); el nombre de cada ingrediente debe coincidir exactamente con una clave de `articulos/sabores` para que el rebranding en cascada funcione:
+```json
+{
+  "recetas": [
+    { "nombre": "Cítrica", "ingredientes": [
+      { "nombre": "Yellow", "porcentaje": 90 },
+      { "nombre": "Polar freeze", "porcentaje": 10 }
+    ]}
+  ]
 }
 ```
 
@@ -368,5 +396,6 @@ npm install
 ### Inicializar Firestore
 1. **`articulos/stock`** — documento con los artículos en mayúsculas
 2. **`articulos/sabores`** — ejecutar `node seed_sabores.js` para cargar el catálogo inicial
-3. **`trabajadores`** — un documento por persona con `email_auth`, `rol` y `activo: true`
-4. **`ajustes/configuracion`** — `{ "stock_forzado": false, "min_version": "2.1.0" }`
+3. **`articulos/mezclas`** — ejecutar `node migrate_mezclas.js` para cargar las recetas iniciales de la Carta (no sobreescribe si el documento ya existe)
+4. **`trabajadores`** — un documento por persona con `email_auth`, `rol` y `activo: true`
+5. **`ajustes/configuracion`** — `{ "stock_forzado": false, "min_version": "2.1.0" }`

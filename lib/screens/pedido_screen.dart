@@ -19,7 +19,8 @@ class _ItemStock {
 }
 
 class PedidoScreen extends StatefulWidget {
-  const PedidoScreen({super.key});
+  final QueryDocumentSnapshot? pedidoExistente;
+  const PedidoScreen({super.key, this.pedidoExistente});
 
   @override
   State<PedidoScreen> createState() => _PedidoScreenState();
@@ -29,6 +30,23 @@ class _PedidoScreenState extends State<PedidoScreen> {
   // Persiste las cantidades introducidas entre rebuilds del stream
   final Map<String, int> _cantidades = {};
   String _busqueda = '';
+
+  bool get _esEdicion => widget.pedidoExistente != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final pedido = widget.pedidoExistente;
+    if (pedido != null) {
+      final items = (pedido.data() as Map<String, dynamic>)['items'] as List? ?? [];
+      for (final item in items) {
+        final map = item as Map<String, dynamic>;
+        final nombre = map['nombre'] as String? ?? '';
+        final cantidad = (map['cantidad'] as num?)?.toInt() ?? 0;
+        if (nombre.isNotEmpty) _cantidades[nombre] = cantidad;
+      }
+    }
+  }
 
   List<_ItemStock> _construirArticulos(Map<String, dynamic> art) {
     final lista = art.entries
@@ -62,7 +80,7 @@ class _PedidoScreenState extends State<PedidoScreen> {
       builder: (c) {
         final items = todos.where((i) => (_cantidades[i.nombre] ?? 0) > 0).toList();
         return AlertDialog(
-          title: const Text('Resumen del pedido'),
+          title: Text(_esEdicion ? 'Resumen del pedido (edición)' : 'Resumen del pedido'),
           content: SizedBox(
             width: 360,
             child: items.isEmpty
@@ -116,8 +134,8 @@ class _PedidoScreenState extends State<PedidoScreen> {
               ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.deepOrange),
                 onPressed: () => Navigator.pop(c, true),
-                child: const Text('CONFIRMAR',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                child: Text(_esEdicion ? 'GUARDAR CAMBIOS' : 'CONFIRMAR',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               ),
           ],
         );
@@ -142,15 +160,24 @@ class _PedidoScreenState extends State<PedidoScreen> {
       return;
     }
 
-    await StockService.guardarPedido(
-      operador: usuarioActual?['nombre'] ?? '?',
-      items: itemsAGuardar,
-    );
+    if (_esEdicion) {
+      await StockService.actualizarPedido(
+        widget.pedidoExistente!.reference,
+        itemsAGuardar,
+      );
+    } else {
+      await StockService.guardarPedido(
+        operador: usuarioActual?['nombre'] ?? '?',
+        items: itemsAGuardar,
+      );
+    }
 
     if (mounted) {
-      setState(() => _cantidades.clear());
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ Pedido guardado en historial')));
+      if (!_esEdicion) setState(() => _cantidades.clear());
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(_esEdicion
+              ? '✅ Pedido actualizado'
+              : '✅ Pedido guardado en historial')));
     }
   }
 
@@ -246,7 +273,7 @@ class _PedidoScreenState extends State<PedidoScreen> {
     final bool dt = sw > 600;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('PEDIDO')),
+      appBar: AppBar(title: Text(_esEdicion ? 'EDITAR PEDIDO' : 'PEDIDO')),
       body: StreamBuilder<DocumentSnapshot>(
         stream: StockService.articulosStream(),
         builder: (context, snapArt) {
@@ -328,8 +355,9 @@ class _PedidoScreenState extends State<PedidoScreen> {
                         style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.deepOrange),
                         icon: const Icon(Icons.check, color: Colors.white),
-                        label: const Text('CONFIRMAR PEDIDO',
-                            style: TextStyle(
+                        label: Text(
+                            _esEdicion ? 'GUARDAR CAMBIOS' : 'CONFIRMAR PEDIDO',
+                            style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
                                 letterSpacing: 1.2)),

@@ -49,7 +49,11 @@ Todos los accesos a Firestore pasan por esta clase. Métodos principales:
 | `saboresRef()` | Referencia al documento único de `articulos/sabores` |
 | `addSabor(nombre, marca, formato, cantidad)` | Añade un sabor nuevo |
 | `deleteSabor(nombre)` | Elimina un campo del documento de sabores |
-| `updateSabor({nombreViejo, nombreNuevo, marca, formato, cantidad})` | Renombra/edita un sabor; si el nombre no cambia, actualiza marca/formato in-place con dot-notation sin tocar la cantidad |
+| `updateSabor({nombreViejo, nombreNuevo, marca, formato, cantidad})` | Renombra/edita un sabor; si el nombre no cambia, actualiza marca/formato in-place con dot-notation sin tocar la cantidad. Si cambia el nombre, en el mismo batch busca y renombra ese ingrediente en todas las recetas de `articulos/mezclas` |
+| `mezclasStream()` / `mezclasRef()` | Stream y referencia del documento único `articulos/mezclas` |
+| `addMezcla(nombre, ingredientes)` | Añade una receta al array `recetas` con `arrayUnion` |
+| `updateMezcla({nombreViejo, nombreNuevo, ingredientes})` | Reemplaza una receta dentro del array `recetas` vía transacción (lee el array completo, sustituye el elemento por nombre, reescribe) |
+| `deleteMezcla(receta)` | Elimina una receta del array `recetas` con `arrayRemove` (requiere el mapa exacto tal como está guardado) |
 | `agregarMovimientos(lista)` | Añade movimientos al log del día actual (merge) |
 | `guardarStock(...)` | Guarda stock final, movimientos y fugas del día (merge) |
 | `logsStream()` | Stream de `logs_diarios` ordenado por fecha descendente |
@@ -256,6 +260,18 @@ Ambos ficheros deben obtenerse desde **Firebase Console → Configuración del p
 ```bash
 node copy_db_to_beta.js
 ```
+
+### `migrate_mezclas.js`
+Script de un solo uso: crea `articulos/mezclas` con las 8 recetas que antes vivían hardcodeadas en `carta_constants.dart` (ya eliminado). No sobreescribe si el documento ya existe, así que es seguro volver a ejecutarlo.
+```bash
+node migrate_mezclas.js
+```
+
+---
+
+## Añadir una mezcla nueva a la Carta
+
+Ya no requiere tocar código ni redesplegar. Desde la app: pantalla **Carta → MEZCLAS** (admin) → botón **NUEVA MEZCLA**, seleccionar sabores y su porcentaje (deben sumar 100%). El nombre de cada ingrediente se guarda igual que la clave del sabor en `articulos/sabores`; si luego se renombra ese sabor desde Catálogo, `StockService.updateSabor` propaga el cambio automáticamente a la mezcla.
 
 ---
 

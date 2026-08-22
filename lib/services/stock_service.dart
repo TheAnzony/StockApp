@@ -56,7 +56,7 @@ class StockService {
     required String marca,
     required String formato,
     required int cantidad,
-  }) {
+  }) async {
     final nuevo = nombreNuevo.trim();
     if (nuevo == nombreViejo) {
       return _saboresRef.update({
@@ -64,9 +64,86 @@ class StockService {
         '$nombreViejo.formato': formato.trim(),
       });
     }
-    return _saboresRef.update({
+
+    final batch = _db.batch();
+    batch.update(_saboresRef, {
       nombreViejo: FieldValue.delete(),
       nuevo: {'marca': marca.trim(), 'formato': formato.trim(), 'cantidad': cantidad},
+    });
+
+    // Rebranding en cascada: si el sabor aparece como ingrediente en alguna
+    // mezcla de la Carta, se actualiza su nombre ahí también.
+    final mezclasSnap = await _mezclasRef.get();
+    if (mezclasSnap.exists) {
+      final data = mezclasSnap.data() as Map<String, dynamic>;
+      final recetas = (data['recetas'] as List?) ?? [];
+      bool cambiado = false;
+      final nuevasRecetas = recetas.map((r) {
+        final receta = Map<String, dynamic>.from(r as Map);
+        final ingredientes = ((receta['ingredientes'] as List?) ?? [])
+            .map((i) {
+          final ing = Map<String, dynamic>.from(i as Map);
+          if (ing['nombre'] == nombreViejo) {
+            ing['nombre'] = nuevo;
+            cambiado = true;
+          }
+          return ing;
+        }).toList();
+        receta['ingredientes'] = ingredientes;
+        return receta;
+      }).toList();
+      if (cambiado) {
+        batch.update(_mezclasRef, {'recetas': nuevasRecetas});
+      }
+    }
+
+    await batch.commit();
+  }
+
+  // ── Mezclas (Carta) ───────────────────────────────────────────────────────
+
+  static DocumentReference get _mezclasRef =>
+      _db.collection(FirebaseCollections.articulos).doc('mezclas');
+
+  static Stream<DocumentSnapshot> mezclasStream() => _mezclasRef.snapshots();
+
+  static DocumentReference mezclasRef() => _mezclasRef;
+
+  static Future<void> addMezcla(
+          String nombre, List<Map<String, dynamic>> ingredientes) =>
+      _mezclasRef.set({
+        'recetas': FieldValue.arrayUnion([
+          {'nombre': nombre.trim(), 'ingredientes': ingredientes}
+        ])
+      }, SetOptions(merge: true));
+
+  static Future<void> deleteMezcla(Map<String, dynamic> receta) =>
+      _mezclasRef.update({
+        'recetas': FieldValue.arrayRemove([receta])
+      });
+
+  static Future<void> updateMezcla({
+    required String nombreViejo,
+    required String nombreNuevo,
+    required List<Map<String, dynamic>> ingredientes,
+  }) {
+    return _db.runTransaction((tx) async {
+      final snap = await tx.get(_mezclasRef);
+      final data = snap.data() as Map<String, dynamic>? ?? {};
+      final recetas = ((data['recetas'] as List?) ?? [])
+          .map((r) => Map<String, dynamic>.from(r as Map))
+          .toList();
+      final index = recetas.indexWhere((r) => r['nombre'] == nombreViejo);
+      final nuevaReceta = {
+        'nombre': nombreNuevo.trim(),
+        'ingredientes': ingredientes,
+      };
+      if (index >= 0) {
+        recetas[index] = nuevaReceta;
+      } else {
+        recetas.add(nuevaReceta);
+      }
+      tx.update(_mezclasRef, {'recetas': recetas});
     });
   }
 
@@ -139,6 +216,10 @@ class StockService {
       .collection(FirebaseCollections.pedidos)
       .orderBy('fecha', descending: true)
       .snapshots();
+
+  static Future<void> actualizarPedido(
+          DocumentReference ref, List<Map<String, dynamic>> items) =>
+      ref.update({'items': items});
 
   static Stream<QuerySnapshot> logsStream() =>
       _db

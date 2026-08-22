@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/stock_service.dart';
+import '../session.dart';
+import 'pedido_screen.dart';
 
 class HistorialPedidosScreen extends StatefulWidget {
   const HistorialPedidosScreen({super.key});
@@ -18,6 +20,9 @@ class _HistorialPedidosScreenState extends State<HistorialPedidosScreen> {
     '', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
   ];
+
+  bool _esMismoDia(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
 
   String _formatFecha(DateTime dt) =>
       '${dt.day.toString().padLeft(2, '0')}-'
@@ -214,11 +219,30 @@ class _HistorialPedidosScreenState extends State<HistorialPedidosScreen> {
     final operador = doc['operador'] as String? ?? '?';
     final items = (doc['items'] as List? ?? []).cast<Map<String, dynamic>>();
 
+    final bool isAdmin = (usuarioActual?['rol'] ?? '') == 'admin';
+    final bool puedeEditar =
+        isAdmin && ts != null && _esMismoDia(ts.toDate(), DateTime.now());
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: ExpansionTile(
         leading: const Icon(Icons.shopping_cart_checkout, color: Colors.deepOrange),
-        title: Text(fecha, style: const TextStyle(fontWeight: FontWeight.bold)),
+        title: Row(
+          children: [
+            Expanded(
+                child: Text(fecha, style: const TextStyle(fontWeight: FontWeight.bold))),
+            if (puedeEditar)
+              IconButton(
+                icon: const Icon(Icons.edit, color: Colors.blueGrey, size: 20),
+                tooltip: 'Editar pedido',
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => PedidoScreen(pedidoExistente: doc)),
+                ),
+              ),
+          ],
+        ),
         subtitle: Text('Por: $operador · ${items.length} artículo${items.length == 1 ? '' : 's'}',
             style: const TextStyle(fontSize: 12, color: Colors.grey)),
         children: items.map((item) {
