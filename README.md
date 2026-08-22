@@ -1,12 +1,49 @@
 # Stock Disco Pro
 
-**Versión actual: 2.1.1**
+**Versión actual: 2.2.0**
 
-Aplicación móvil y web para la gestión de stock de cachimbas en una discoteca. Permite controlar el inventario en tiempo real, registrar entradas, roturas y préstamos, gestionar sabores con marca y formato, generar pedidos inteligentes y consultar el historial de movimientos por categoría.
+Aplicación móvil y web para la gestión de stock de cachimbas en una discoteca. Permite controlar el inventario en tiempo real, registrar entradas, roturas y préstamos, gestionar sabores con marca y formato, generar pedidos y consultar el historial de movimientos por categoría.
 
 ---
 
 ## Historial de versiones
+
+### v2.2.0 — Rework de Pedido, Recibir, Prestado, Roturas y Catálogo
+
+#### PEDIDO — rediseño sin sugerencias
+- Eliminadas las reglas automáticas de sugerencia y el concepto de prioridad (alta/media/baja/manual)
+- Ahora se listan **todos** los artículos y sabores del catálogo en dos secciones separadas (ARTÍCULOS y SABORES), cada uno con su stock actual y un campo de cantidad a pedir
+- Buscador para filtrar la lista
+- Al confirmar se muestra un resumen (solo ítems con cantidad > 0) con opción de VOLVER a editar o CONFIRMAR
+- El campo `prioridad` ya no se guarda en los documentos de `pedidos`
+
+#### RECIBIR MATERIAL — rediseño con concepto por ítem
+- Ya no hay diálogos por artículo: se listan todos los artículos y sabores (con stock actual) de una vez, igual que en PEDIDO
+- El concepto (STOCK NUEVO / DEVOLUCIÓN PRESTADO) se elige **por ítem**, no para todo el lote — permite mezclar en una misma recepción, por ejemplo, tabaco de pedido semanal con una devolución de otro local
+- El campo "¿de dónde viene?" aparece solo en los ítems marcados como devolución
+- Los sabores recibidos ahora también generan entrada en el historial de RECIBIDOS con su concepto (antes solo se sumaba la cantidad sin dejar rastro)
+- Resumen de confirmación antes de guardar, igual que en PEDIDO
+
+#### ROTURAS — lista dinámica
+- Ya no usa una lista fija en código (`itemsRoturas`); ahora lista automáticamente todos los campos del documento `articulos/stock` (los sabores no aparecen, viven en otro documento)
+- Muestra el stock actual de cada artículo junto a la casilla de selección
+
+#### PRESTADO — rediseño con validación de stock
+- Lista todos los artículos con su stock actual y un campo de cantidad, igual que PEDIDO/RECIBIR
+- La cantidad a prestar no puede ser negativa ni superar el stock disponible (se recorta automáticamente)
+- Eliminado el descuento automático de mangueras al prestar cachimbas: ahora mangueras aparece en la lista y hay que registrarla manualmente si corresponde
+- Resumen de confirmación con destino y artículos antes de guardar
+
+#### CATÁLOGO — edición de artículos y sabores
+- Nuevo botón de editar (lápiz) en cada ítem de STOCK y SABORES
+- Artículos: se puede renombrar (conserva el stock actual)
+- Sabores: se puede renombrar, cambiar de marca y de formato (conserva la cantidad actual)
+- Validación anti-colisión: no deja renombrar a un nombre ya usado por otro ítem
+
+#### Corrección: orden de días en Historiales
+- Los días dentro de cada mes se ordenaban como texto en vez de como fecha (p. ej. el día 19 aparecía antes que el día 2). Corregido para ordenar numéricamente.
+
+---
 
 ### v2.1.1 — Prioridad alta automática para stock en 0
 
@@ -137,26 +174,25 @@ Aplicación móvil y web para la gestión de stock de cachimbas en una discoteca
 - El conteo recupera automáticamente el estado anterior si la sesión se interrumpe.
 
 ### Recibir Material
-- Permite añadir artículos y sabores a una lista antes de confirmar.
-- **Artículos**: artículo, cantidad, concepto (STOCK NUEVO / DEVOLUCIÓN PRESTADO) y origen.
-- **Sabores**: selector con nombre, marca y formato; incrementa `cantidad` en `articulos/sabores`.
-- Al confirmar: artículos actualizan stock y generan log; sabores actualizan cantidad directamente.
+- Lista completa de artículos y sabores (con su stock actual) en dos secciones, con un campo de cantidad recibida por ítem; solo se procesan los ítems con cantidad > 0.
+- Cada ítem lleva su propio concepto (STOCK NUEVO / DEVOLUCIÓN PRESTADO), con campo de origen si es devolución — permite mezclar conceptos distintos en una misma recepción.
+- Resumen antes de confirmar, con opción de volver a editar.
+- Al confirmar: artículos y sabores actualizan stock y generan log en `logs_diarios` con motivo RECIBIDO y su concepto.
 
 ### Roturas
-- Lista fija de artículos. Al romper una cachimba, el mástil sube automáticamente.
+- Lista dinámica con todos los artículos del stock (excepto tabaco), mostrando el stock actual de cada uno. Al romper una cachimba, el mástil sube automáticamente.
 
 ### Prestado
-- Al prestar cachimbas, las mangueras se descuentan automáticamente.
+- Lista con todos los artículos del stock y su stock actual; la cantidad a prestar no puede superar el stock disponible. Las mangueras deben registrarse manualmente si se prestan junto con las cachimbas (ya no se descuentan solas).
 
 ### Carta
 - **MEZCLAS**: recetas con ingredientes, porcentajes y barra visual de color.
 - **SABORES**: stock en tiempo real con marca y formato; botón USAR para todos los roles; reajuste directo para admin.
 
 ### Pedido _(admin / encargado)_
-- Sugerencias automáticas basadas en reglas de stock con indicador de prioridad (rojo / naranja / amarillo).
-- Cantidad editable por ítem (sugerencia, comienza en 0).
-- Añadir artículos o sabores manualmente con buscador.
-- CONFIRMAR PEDIDO guarda la lista en la colección `pedidos` con fecha y operador.
+- Lista completa de artículos y sabores (con su stock actual) en dos secciones separadas, con buscador y un campo de cantidad a pedir por ítem.
+- Resumen antes de confirmar, con opción de volver a editar la lista.
+- CONFIRMAR PEDIDO guarda en la colección `pedidos` (solo ítems con cantidad > 0) con fecha y operador.
 
 ### Historiales _(encargado / admin)_
 Cinco categorías, todas con meses colapsables y filtro por año:
@@ -167,11 +203,11 @@ Cinco categorías, todas con meses colapsables y filtro por año:
 | ROTURAS | Movimientos con motivo `ROTURAS` |
 | PRESTADOS | Movimientos con motivo `PRESTADO` |
 | GENERALES | Resultado del realizar stock diario con stock final, roturas y descuadres |
-| PEDIDOS | Pedidos confirmados con artículos, sabores, prioridad y cantidad |
+| PEDIDOS | Pedidos confirmados con artículos, sabores y cantidad |
 
 ### Catálogo _(admin)_
-- **STOCK**: añadir y eliminar artículos del inventario.
-- **SABORES**: añadir sabores (nombre, marca, formato, cantidad inicial) y eliminarlos. La lista muestra marca, formato y stock actual.
+- **STOCK**: añadir, editar (renombrar) y eliminar artículos del inventario.
+- **SABORES**: añadir sabores (nombre, marca, formato, cantidad inicial), editar (nombre, marca, formato) y eliminarlos. La lista muestra marca, formato y stock actual.
 
 ### Gestión de Staff _(admin)_
 - Alta, edición, cambio de PIN y desactivación de trabajadores.
@@ -184,10 +220,9 @@ Cinco categorías, todas con meses colapsables y filtro por año:
 ## Reglas de negocio
 
 - **Mástil**: al registrar una rotura de cachimba, el mástil sube automáticamente la misma cantidad.
-- **Mangueras automáticas**: al prestar cachimbas, las mangueras se descuentan automáticamente.
+- **Préstamo de mangueras**: es manual; si se prestan cachimbas junto con mangueras hay que registrar ambas por separado (ya no hay descuento automático).
 - **Horario de stock**: domingos entre las 5:00 y las 12:00. El admin puede forzar la apertura.
 - **Descuadres**: al cerrar el stock se clasifican en roturas, prestados y desconocido (`fugas` en el log).
-- **Pedido inteligente**: las reglas se evalúan en tiempo real contra el stock actual. Los ítems sugeridos desaparecen si el stock sube por encima del umbral.
 - **Versión mínima**: `ajustes/configuracion.min_version` bloquea versiones anteriores.
 
 ---
@@ -221,7 +256,7 @@ lib/
     roturas_screen.dart              # Registro de roturas
     prestado_screen.dart             # Registro de préstamos
     carta_screen.dart                # Recetas (MEZCLAS) y sabores con stock (SABORES)
-    pedido_screen.dart               # Sugerencias de pedido con reglas automáticas
+    pedido_screen.dart               # Lista completa de artículos/sabores para pedir
     historial_seleccion_screen.dart  # Menú de selección de tipo de historial
     historial_filtrado_screen.dart   # Logs de movimientos con meses colapsables
     historial_pedidos_screen.dart    # Historial de pedidos confirmados
@@ -253,7 +288,7 @@ Documento único con sabores como mapa anidado:
 ```json
 {
   "Magic Love":   { "marca": "Alfaker", "formato": "200gr", "cantidad": 28 },
-  "Happy bound":  { "marca": "SK",      "formato": "50gr",  "cantidad": 11 },
+  "Happy hound":  { "marca": "SK",      "formato": "50gr",  "cantidad": 11 },
   "Yellow":       { "marca": "Alfaker", "formato": "200gr", "cantidad": 10 }
 }
 ```
@@ -285,8 +320,8 @@ Un documento por pedido confirmado (ID auto-generado):
   "fecha": "Timestamp",
   "operador": "Antonio",
   "items": [
-    { "nombre": "CAZOLETAS", "esSabor": false, "prioridad": "alta",   "cantidad": 50 },
-    { "nombre": "Magic Love", "esSabor": true,  "prioridad": "media",  "cantidad": 10 }
+    { "nombre": "CAZOLETAS", "esSabor": false, "cantidad": 50 },
+    { "nombre": "Magic Love", "esSabor": true,  "cantidad": 10 }
   ]
 }
 ```

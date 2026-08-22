@@ -40,13 +40,21 @@ Todos los accesos a Firestore pasan por esta clase. Métodos principales:
 
 | Método | Descripción |
 |---|---|
-| `articulosStream()` | Stream en tiempo real de la colección `articulos` |
-| `articulosRef()` | Referencia al documento único de `articulos` |
-| `addArticulo(nombre)` | Añade un artículo nuevo con valor 0 |
+| `articulosStream()` | Stream en tiempo real del documento único `articulos/stock` |
+| `articulosRef()` | Referencia al documento único de `articulos/stock` |
+| `addArticulo(nombre)` | Añade un artículo nuevo con valor 0 (nombre forzado a mayúsculas) |
 | `deleteArticulo(ref, nombre)` | Elimina un campo del documento de artículos |
+| `updateArticulo({nombreViejo, nombreNuevo, valorActual})` | Renombra un artículo conservando su stock actual |
+| `saboresStream()` | Stream en tiempo real del documento único `articulos/sabores` |
+| `saboresRef()` | Referencia al documento único de `articulos/sabores` |
+| `addSabor(nombre, marca, formato, cantidad)` | Añade un sabor nuevo |
+| `deleteSabor(nombre)` | Elimina un campo del documento de sabores |
+| `updateSabor({nombreViejo, nombreNuevo, marca, formato, cantidad})` | Renombra/edita un sabor; si el nombre no cambia, actualiza marca/formato in-place con dot-notation sin tocar la cantidad |
 | `agregarMovimientos(lista)` | Añade movimientos al log del día actual (merge) |
 | `guardarStock(...)` | Guarda stock final, movimientos y fugas del día (merge) |
 | `logsStream()` | Stream de `logs_diarios` ordenado por fecha descendente |
+| `guardarPedido({items, operador})` | Crea un documento nuevo en `pedidos` con fecha de servidor |
+| `pedidosStream()` | Stream de `pedidos` ordenado por fecha descendente |
 | `configuracionStream()` | Stream del documento `ajustes/configuracion` |
 | `setStockForzado(bool)` | Actualiza el campo `stock_forzado` en Firestore |
 | `trabajadoresStream(activo)` | Stream de trabajadores filtrado por estado activo |
@@ -85,18 +93,11 @@ Guarda en el documento del día actual (`logs_diarios/YYYY-M-D`) usando `SetOpti
 ### `ArticuloConstants`
 
 ```dart
-ArticuloConstants.itemsRoturas
-```
-Lista fija de artículos que pueden registrarse como rotura:
-`cazoletas`, `kalouds`, `cachimbas`, `bases`, `hornillos`, `boquilla mangueras`, `punzones`.
-
-```dart
 ArticuloConstants.cachimbas  // 'cachimbas'
-ArticuloConstants.mangueras  // 'mangueras'
 ArticuloConstants.mastil     // 'mastil'
 ```
 
-Usadas para los comportamientos automáticos (ver reglas de negocio).
+Usadas solo para el comportamiento automático de roturas (cachimba rota → sube mástil). Ya no hay lista fija de artículos para Roturas ni Prestado: ambas pantallas listan dinámicamente todos los campos de `articulos/stock`.
 
 ### `FirebaseCollections` y `FirebaseFields`
 
@@ -143,15 +144,8 @@ if (k == ArticuloConstants.cachimbas) {
 ```
 El mástil incrementa porque se separa del conjunto y se puede reutilizar.
 
-### Préstamo de cachimbas → mangueras bajan
-En `prestado_screen.dart`, al confirmar:
-```dart
-if (k.toLowerCase() == ArticuloConstants.cachimbas) {
-  updates[ArticuloConstants.mangueras] = FieldValue.increment(val);
-  // val es negativo
-}
-```
-Las mangueras se descuentan automáticamente porque van incluidas con cada cachimba prestada. Se registra también un movimiento de mangueras con motivo `PRESTADO`.
+### Préstamo (`prestado_screen.dart`)
+Lista dinámica con todos los artículos del documento `articulos/stock` (incluidas mangueras) y su stock actual. La cantidad a prestar por ítem se acota con `.clamp(0, item.stock)`, por lo que nunca se puede prestar más de lo disponible ni una cantidad negativa. Ya no existe descuento automático de mangueras al prestar cachimbas: si se prestan ambas hay que seleccionarlas y confirmarlas por separado.
 
 ---
 
@@ -190,6 +184,8 @@ data.containsKey('stock_final')
 Los documentos de días con solo movimientos (sin realizar stock) no aparecen en GENERALES.
 
 Los documentos con `fugas` en formato antiguo (mapa plano `{articulo: diferencia}`) se muestran todos bajo el segmento **Desconocido** para mantener compatibilidad con registros previos a v1.0.5.
+
+**Orden de días dentro de un mes**: el ID del documento es `YYYY-M-D` sin ceros a la izquierda, así que comparar los IDs como texto ordena mal (p. ej. "19" antes que "2"). Por eso se ordena parseando el día a entero (`_diaDeId`) en vez de comparar el string completo.
 
 ---
 
@@ -267,8 +263,8 @@ node copy_db_to_beta.js
 
 1. Desde la app: pantalla **Catálogo** (admin) → añadir artículo.
 2. El artículo se guarda en mayúsculas como campo del documento único de `articulos` con valor 0.
-3. Si el artículo tiene comportamiento especial (como cachimbas o mástil), hay que añadir la lógica correspondiente en `roturas_screen.dart`, `prestado_screen.dart` y `ArticuloConstants`.
-4. Si debe aparecer en la lista de roturas, añadirlo a `ArticuloConstants.itemsRoturas` en `constants.dart`.
+3. Si el artículo tiene comportamiento especial (como cachimbas o mástil), hay que añadir la lógica correspondiente en `roturas_screen.dart` y `ArticuloConstants`.
+4. Las pantallas de **Roturas**, **Prestado**, **Pedido** y **Recibir Material** listan automáticamente todos los campos del documento `articulos/stock` (no hace falta registrar el artículo en ningún sitio aparte); los sabores no aparecen en Roturas/Prestado porque viven en el documento `articulos/sabores`.
 
 ---
 

@@ -19,7 +19,7 @@ class CartaConstants {
     Receta('Batido de Menta', [
       Ingrediente('Polar freeze', 10),
       Ingrediente('Green velvet', 40),
-      Ingrediente('Showtime Symphony', 40),
+      Ingrediente('Big Green', 40),
       Ingrediente('Ivory gold', 10),
     ]),
     Receta('Frutos Rojos', [
@@ -35,7 +35,7 @@ class CartaConstants {
       Ingrediente('Magic Love (Alfaker)', 100),
     ]),
     Receta('Dulce', [
-      Ingrediente('Happy bound (SK)', 100),
+      Ingrediente('Happy hound (SK)', 100),
     ]),
     Receta('Sandía Melón', [
       Ingrediente('Plata o plomo (SK)', 50),

@@ -4,19 +4,17 @@ import '../models/sabor.dart';
 import '../services/stock_service.dart';
 import '../session.dart';
 
-enum PrioridadPedido { alta, media, baja, manual }
-
-class ItemPedido {
+class _ItemStock {
   final String nombre;
   final bool esSabor;
-  final PrioridadPedido prioridad;
-  int cantidad;
+  final int stock;
+  final String? subtitulo;
 
-  ItemPedido({
+  _ItemStock({
     required this.nombre,
     required this.esSabor,
-    required this.prioridad,
-    this.cantidad = 0,
+    required this.stock,
+    this.subtitulo,
   });
 }
 
@@ -28,188 +26,102 @@ class PedidoScreen extends StatefulWidget {
 }
 
 class _PedidoScreenState extends State<PedidoScreen> {
-  final List<ItemPedido> _manuales = [];
-  Map<String, dynamic> _articulosCache = {};
-  Map<String, dynamic> _saboresCache = {};
   // Persiste las cantidades introducidas entre rebuilds del stream
   final Map<String, int> _cantidades = {};
+  String _busqueda = '';
 
-  // Case-insensitive lookup normalizando acentos
-  int _get(Map<String, dynamic> data, String key) {
-    final norm = _norm(key);
-    for (final entry in data.entries) {
-      if (_norm(entry.key) == norm) {
-        return (entry.value as num?)?.toInt() ?? 0;
-      }
-    }
-    return 0;
-  }
-
-  String _norm(String s) {
-    const Map<String, String> map = {
-      'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u',
-      'ü': 'u', 'ñ': 'n',
-    };
-    return s.toLowerCase().split('').map((c) => map[c] ?? c).join('');
-  }
-
-  List<ItemPedido> _calcularSugerencias(
-    Map<String, dynamic> art,
-    Map<String, dynamic> sab,
-  ) {
-    final List<ItemPedido> lista = [];
-
-    final cachimbas   = _get(art, 'cachimbas');
-    final mastil      = _get(art, 'mastil');
-    final cazoletas   = _get(art, 'cazoletas');
-    final mangueras   = _get(art, 'mangueras');
-    final bases       = _get(art, 'bases');
-    final liquidoBases = _get(art, 'liquido bases');
-    final hornillos   = _get(art, 'hornillos');
-
-    // CAZOLETAS (0 ya queda cubierto por < 50 → alta)
-    if (cazoletas < 50) {
-      lista.add(ItemPedido(nombre: 'CAZOLETAS', esSabor: false, prioridad: PrioridadPedido.alta));
-    } else if (cazoletas < cachimbas - 15) {
-      lista.add(ItemPedido(nombre: 'CAZOLETAS', esSabor: false, prioridad: PrioridadPedido.media));
-    }
-
-    // BASES
-    if (bases == 0 || mastil > bases) {
-      lista.add(ItemPedido(
-        nombre: 'BASES',
-        esSabor: false,
-        prioridad: (bases == 0 || mastil > 5) ? PrioridadPedido.alta : PrioridadPedido.media,
-      ));
-    }
-
-    // LÍQUIDO BASES
-    if (liquidoBases == 0) {
-      lista.add(ItemPedido(nombre: 'LÍQUIDO BASES', esSabor: false, prioridad: PrioridadPedido.alta));
-    } else if (liquidoBases == 1) {
-      lista.add(ItemPedido(nombre: 'LÍQUIDO BASES', esSabor: false, prioridad: PrioridadPedido.media));
-    }
-
-    // CACHIMBAS
-    final totalCachimbas = cachimbas + mastil;
-    if (cachimbas == 0 || totalCachimbas < 40) {
-      lista.add(ItemPedido(nombre: 'CACHIMBAS', esSabor: false, prioridad: PrioridadPedido.alta));
-    } else if (totalCachimbas <= 50) {
-      lista.add(ItemPedido(nombre: 'CACHIMBAS', esSabor: false, prioridad: PrioridadPedido.media));
-    }
-
-    // MANGUERAS (diferencia con cachimbas)
-    final diffMangueras = cachimbas - mangueras;
-    if (mangueras == 0 || diffMangueras >= 10) {
-      lista.add(ItemPedido(nombre: 'MANGUERAS', esSabor: false, prioridad: PrioridadPedido.alta));
-    } else if (diffMangueras > 0) {
-      lista.add(ItemPedido(nombre: 'MANGUERAS', esSabor: false, prioridad: PrioridadPedido.media));
-    }
-
-    // HORNILLOS
-    if (hornillos == 0) {
-      lista.add(ItemPedido(nombre: 'HORNILLOS', esSabor: false, prioridad: PrioridadPedido.alta));
-    } else if (hornillos <= 2) {
-      lista.add(ItemPedido(nombre: 'HORNILLOS', esSabor: false, prioridad: PrioridadPedido.media));
-    }
-
-    // SABORES
-    for (final entry in sab.entries) {
-      final s = Sabor.fromEntry(entry.key, entry.value);
-      PrioridadPedido? prioridad;
-
-      if (s.cantidad == 0) {
-        prioridad = PrioridadPedido.alta;
-      } else if (s.formato == '50gr') {
-        if (s.cantidad < 10) {
-          prioridad = PrioridadPedido.media;
-        } else if (s.cantidad < 20) {
-          prioridad = PrioridadPedido.baja;
-        }
-      } else if (s.formato == '100gr') {
-        if (s.cantidad < 2) prioridad = PrioridadPedido.media;
-      } else if (s.formato == '200gr') {
-        final umbral = (s.nombre == 'Magic Love' || s.nombre == 'Snowy Fucsia Green') ? 10 : 5;
-        if (s.cantidad < umbral) prioridad = PrioridadPedido.media;
-      }
-
-      if (prioridad != null) {
-        lista.add(ItemPedido(nombre: s.nombre, esSabor: true, prioridad: prioridad));
-      }
-    }
-
-    lista.sort((a, b) => _ordenPrioridad(a.prioridad).compareTo(_ordenPrioridad(b.prioridad)));
+  List<_ItemStock> _construirArticulos(Map<String, dynamic> art) {
+    final lista = art.entries
+        .map((entry) => _ItemStock(
+              nombre: entry.key,
+              esSabor: false,
+              stock: (entry.value as num?)?.toInt() ?? 0,
+            ))
+        .toList();
+    lista.sort((a, b) => a.nombre.toLowerCase().compareTo(b.nombre.toLowerCase()));
     return lista;
   }
 
-  int _ordenPrioridad(PrioridadPedido p) => p.index;
-
-  Color _colorPrioridad(PrioridadPedido p) {
-    switch (p) {
-      case PrioridadPedido.alta:   return Colors.redAccent;
-      case PrioridadPedido.media:  return Colors.orange;
-      case PrioridadPedido.baja:   return Colors.amber;
-      case PrioridadPedido.manual: return Colors.blueGrey;
-    }
+  List<_ItemStock> _construirSabores(Map<String, dynamic> sab) {
+    final lista = sab.entries.map((entry) {
+      final s = Sabor.fromEntry(entry.key, entry.value);
+      return _ItemStock(
+        nombre: s.nombre,
+        esSabor: true,
+        stock: s.cantidad,
+        subtitulo: s.marca.isNotEmpty ? '${s.marca} · ${s.formato}' : null,
+      );
+    }).toList();
+    lista.sort((a, b) => a.nombre.toLowerCase().compareTo(b.nombre.toLowerCase()));
+    return lista;
   }
 
-  String _labelPrioridad(PrioridadPedido p) {
-    switch (p) {
-      case PrioridadPedido.alta:   return 'ALTA';
-      case PrioridadPedido.media:  return 'MEDIA';
-      case PrioridadPedido.baja:   return 'BAJA';
-      case PrioridadPedido.manual: return 'MANUAL';
-    }
-  }
-
-  void _dialogoAnadir() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: const Color(0xFF1A1A1A),
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (c) => _BottomSheetAnadir(
-        articulos: _articulosCache,
-        saboresData: _saboresCache,
-        yaEnLista: {..._manuales.map((e) => e.nombre)},
-        onAnadir: (nombre, esSabor) {
-          setState(() {
-            _manuales.add(ItemPedido(
-              nombre: nombre,
-              esSabor: esSabor,
-              prioridad: PrioridadPedido.manual,
-            ));
-          });
-        },
-      ),
-    );
-  }
-
-  Future<void> _confirmarPedido(List<ItemPedido> todos) async {
+  Future<void> _confirmarPedido(List<_ItemStock> todos) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (c) => AlertDialog(
-        title: const Text('Confirmar pedido'),
-        content: Builder(builder: (context) {
-          final conCantidad =
-              todos.where((i) => (_cantidades[i.nombre] ?? 0) > 0).length;
-          return Text(conCantidad == 0
-              ? 'No hay artículos con cantidad mayor a 0.'
-              : '¿Guardar este pedido con $conCantidad artículo${conCantidad == 1 ? '' : 's'}?');
-        }),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(c, false),
-              child: const Text('CANCELAR')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.deepOrange),
-            onPressed: () => Navigator.pop(c, true),
-            child: const Text('CONFIRMAR',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+      builder: (c) {
+        final items = todos.where((i) => (_cantidades[i.nombre] ?? 0) > 0).toList();
+        return AlertDialog(
+          title: const Text('Resumen del pedido'),
+          content: SizedBox(
+            width: 360,
+            child: items.isEmpty
+                ? const Text('No hay artículos con cantidad mayor a 0.')
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                          '${items.length} artículo${items.length == 1 ? '' : 's'} en este pedido:',
+                          style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                      const SizedBox(height: 10),
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                            maxHeight: MediaQuery.of(context).size.height * 0.5),
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          itemCount: items.length,
+                          separatorBuilder: (_, _) =>
+                              const Divider(height: 1, color: Colors.white12),
+                          itemBuilder: (context, i) {
+                            final item = items[i];
+                            final nombre =
+                                item.esSabor ? item.nombre : item.nombre.toUpperCase();
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(nombre,
+                                        style: const TextStyle(fontWeight: FontWeight.w600)),
+                                  ),
+                                  Text('x${_cantidades[item.nombre]}',
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.deepOrange)),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
           ),
-        ],
-      ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(c, false),
+                child: const Text('VOLVER')),
+            if (items.isNotEmpty)
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.deepOrange),
+                onPressed: () => Navigator.pop(c, true),
+                child: const Text('CONFIRMAR',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+          ],
+        );
+      },
     );
     if (ok != true || !mounted) return;
 
@@ -218,7 +130,6 @@ class _PedidoScreenState extends State<PedidoScreen> {
         .map((i) => {
               'nombre': i.nombre,
               'esSabor': i.esSabor,
-              'prioridad': i.prioridad.name,
               'cantidad': _cantidades[i.nombre]!,
             })
         .toList();
@@ -237,87 +148,67 @@ class _PedidoScreenState extends State<PedidoScreen> {
     );
 
     if (mounted) {
-      setState(() {
-        _manuales.clear();
-        _cantidades.clear();
-      });
+      setState(() => _cantidades.clear());
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('✅ Pedido guardado en historial')));
     }
   }
 
-  Widget _buildCard(ItemPedido item) {
-    final color = _colorPrioridad(item.prioridad);
-    final esManual = item.prioridad == PrioridadPedido.manual;
-
+  Widget _buildCard(_ItemStock item) {
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: IntrinsicHeight(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         child: Row(
           children: [
-            Container(
-              width: 5,
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(12),
-                  bottomLeft: Radius.circular(12),
-                ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(item.esSabor ? item.nombre : item.nombre.toUpperCase(),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 15)),
+                  if (item.subtitulo != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(item.subtitulo!,
+                          style: const TextStyle(
+                              fontSize: 11, color: Colors.white54)),
+                    ),
+                ],
               ),
             ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              _chip(_labelPrioridad(item.prioridad), color),
-                              if (item.esSabor) ...[
-                                const SizedBox(width: 6),
-                                _chip('SABOR', Colors.indigo),
-                              ],
-                            ],
-                          ),
-                          const SizedBox(height: 5),
-                          Text(item.nombre,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 15)),
-                        ],
-                      ),
-                    ),
-                    SizedBox(
-                      width: 62,
-                      child: TextFormField(
-                        key: Key('ped_${item.nombre}'),
-                        initialValue: '${_cantidades[item.nombre] ?? 0}',
-                        keyboardType: TextInputType.number,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold),
-                        decoration: const InputDecoration(
-                            isDense: true, border: OutlineInputBorder()),
-                        onChanged: (v) =>
-                            _cantidades[item.nombre] = int.tryParse(v) ?? 0,
-                      ),
-                    ),
-                    if (esManual) ...[
-                      const SizedBox(width: 4),
-                      IconButton(
-                        icon: const Icon(Icons.close,
-                            color: Colors.redAccent, size: 20),
-                        onPressed: () => setState(() =>
-                            _manuales.removeWhere((m) => m.nombre == item.nombre)),
-                      ),
-                    ] else
-                      const SizedBox(width: 44),
-                  ],
-                ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              margin: const EdgeInsets.only(right: 10),
+              decoration: BoxDecoration(
+                color: Colors.white10,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                children: [
+                  const Text('STOCK',
+                      style: TextStyle(fontSize: 9, color: Colors.white38)),
+                  Text('${item.stock}',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 15)),
+                ],
+              ),
+            ),
+            SizedBox(
+              width: 62,
+              child: TextFormField(
+                key: Key('ped_${item.nombre}'),
+                initialValue: '${_cantidades[item.nombre] ?? 0}',
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                    fontSize: 18, fontWeight: FontWeight.bold),
+                decoration: const InputDecoration(
+                    isDense: true, border: OutlineInputBorder()),
+                onChanged: (v) =>
+                    _cantidades[item.nombre] = int.tryParse(v) ?? 0,
               ),
             ),
           ],
@@ -326,16 +217,27 @@ class _PedidoScreenState extends State<PedidoScreen> {
     );
   }
 
-  Widget _chip(String label, Color color) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: color, width: 1),
+  Widget _buildHeader(String label) => Padding(
+        padding: const EdgeInsets.fromLTRB(2, 16, 2, 8),
+        child: Row(
+          children: [
+            Container(
+              width: 4,
+              height: 16,
+              decoration: BoxDecoration(
+                color: Colors.deepOrange,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(label,
+                style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: Colors.deepOrange,
+                    letterSpacing: 1.5)),
+          ],
         ),
-        child: Text(label,
-            style: TextStyle(
-                fontSize: 10, fontWeight: FontWeight.bold, color: color)),
       );
 
   @override
@@ -345,12 +247,6 @@ class _PedidoScreenState extends State<PedidoScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('PEDIDO')),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _dialogoAnadir,
-        backgroundColor: Colors.blueGrey,
-        tooltip: 'Añadir manualmente',
-        child: const Icon(Icons.add),
-      ),
       body: StreamBuilder<DocumentSnapshot>(
         stream: StockService.articulosStream(),
         builder: (context, snapArt) {
@@ -361,44 +257,34 @@ class _PedidoScreenState extends State<PedidoScreen> {
                 return const Center(child: CircularProgressIndicator());
               }
 
-              _articulosCache = snapArt.data!.exists
+              final articulosCache = snapArt.data!.exists
                   ? snapArt.data!.data() as Map<String, dynamic>
-                  : {};
-              _saboresCache = snapSab.data!.exists
+                  : <String, dynamic>{};
+              final saboresCache = snapSab.data!.exists
                   ? snapSab.data!.data() as Map<String, dynamic>
-                  : {};
+                  : <String, dynamic>{};
 
-              final sugerencias = _calcularSugerencias(_articulosCache, _saboresCache);
-              final nombresSugeridos = sugerencias.map((e) => e.nombre).toSet();
-              final manualesFiltrados =
-                  _manuales.where((m) => !nombresSugeridos.contains(m.nombre)).toList();
+              final articulos = _construirArticulos(articulosCache);
+              final sabores = _construirSabores(saboresCache);
+              final todos = [...articulos, ...sabores];
 
-              final todos = [...sugerencias, ...manualesFiltrados];
-              todos.sort((a, b) =>
-                  _ordenPrioridad(a.prioridad).compareTo(_ordenPrioridad(b.prioridad)));
+              bool coincide(_ItemStock i) => _busqueda.isEmpty ||
+                  i.nombre.toLowerCase().contains(_busqueda.toLowerCase());
+              final articulosFiltrados = articulos.where(coincide).toList();
+              final saboresFiltrados = sabores.where(coincide).toList();
 
-              if (todos.isEmpty) {
-                return const Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.check_circle_outline,
-                          color: Colors.green, size: 64),
-                      SizedBox(height: 16),
-                      Text('Todo el stock está en orden',
-                          style: TextStyle(fontSize: 16, color: Colors.grey)),
-                      SizedBox(height: 8),
-                      Text('Usa + para añadir artículos manualmente',
-                          style: TextStyle(fontSize: 13, color: Colors.white38)),
-                    ],
-                  ),
-                );
-              }
-
-              Widget listView = ListView.builder(
+              Widget listView = ListView(
                 padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-                itemCount: todos.length,
-                itemBuilder: (context, i) => _buildCard(todos[i]),
+                children: [
+                  if (articulosFiltrados.isNotEmpty) ...[
+                    _buildHeader('ARTÍCULOS'),
+                    ...articulosFiltrados.map(_buildCard),
+                  ],
+                  if (saboresFiltrados.isNotEmpty) ...[
+                    _buildHeader('SABORES'),
+                    ...saboresFiltrados.map(_buildCard),
+                  ],
+                ],
               );
 
               final Widget lista = dt
@@ -407,8 +293,26 @@ class _PedidoScreenState extends State<PedidoScreen> {
                       child: SizedBox(width: sw * 0.6, child: listView))
                   : listView;
 
+              Widget buscador = Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                child: TextField(
+                  decoration: const InputDecoration(
+                    hintText: 'Buscar artículo o sabor...',
+                    prefixIcon: Icon(Icons.search),
+                    isDense: true,
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: (v) => setState(() => _busqueda = v),
+                ),
+              );
+
               return Column(
                 children: [
+                  dt
+                      ? Align(
+                          alignment: Alignment.topCenter,
+                          child: SizedBox(width: sw * 0.6, child: buscador))
+                      : buscador,
                   Expanded(child: lista),
                   Container(
                     padding: const EdgeInsets.all(16),
@@ -437,135 +341,6 @@ class _PedidoScreenState extends State<PedidoScreen> {
             },
           );
         },
-      ),
-    );
-  }
-}
-
-// ─── Bottom sheet para añadir manualmente ────────────────────────────────────
-
-class _BottomSheetAnadir extends StatefulWidget {
-  final Map<String, dynamic> articulos;
-  final Map<String, dynamic> saboresData;
-  final Set<String> yaEnLista;
-  final void Function(String nombre, bool esSabor) onAnadir;
-
-  const _BottomSheetAnadir({
-    required this.articulos,
-    required this.saboresData,
-    required this.yaEnLista,
-    required this.onAnadir,
-  });
-
-  @override
-  State<_BottomSheetAnadir> createState() => _BottomSheetAnadirState();
-}
-
-class _BottomSheetAnadirState extends State<_BottomSheetAnadir>
-    with SingleTickerProviderStateMixin {
-  late TabController _tab;
-  String _busqueda = '';
-
-  @override
-  void initState() {
-    super.initState();
-    _tab = TabController(length: 2, vsync: this);
-    _tab.addListener(() => setState(() {}));
-  }
-
-  @override
-  void dispose() {
-    _tab.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final articulosFiltrados = widget.articulos.keys
-        .where((k) =>
-            !widget.yaEnLista.contains(k) &&
-            k.toLowerCase().contains(_busqueda.toLowerCase()))
-        .toList()
-      ..sort();
-
-    final saboresFiltrados = widget.saboresData.entries
-        .map((e) => Sabor.fromEntry(e.key, e.value))
-        .where((s) =>
-            !widget.yaEnLista.contains(s.nombre) &&
-            s.nombre.toLowerCase().contains(_busqueda.toLowerCase()))
-        .toList()
-      ..sort((a, b) => a.nombre.compareTo(b.nombre));
-
-    return DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.7,
-      maxChildSize: 0.92,
-      builder: (c, scroll) => Column(
-        children: [
-          const SizedBox(height: 12),
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-                color: Colors.white24,
-                borderRadius: BorderRadius.circular(2)),
-          ),
-          const SizedBox(height: 8),
-          TabBar(
-            controller: _tab,
-            tabs: const [Tab(text: 'ARTÍCULOS'), Tab(text: 'SABORES')],
-          ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: TextField(
-              decoration: const InputDecoration(
-                hintText: 'Buscar...',
-                prefixIcon: Icon(Icons.search),
-                isDense: true,
-                border: OutlineInputBorder(),
-              ),
-              onChanged: (v) => setState(() => _busqueda = v),
-            ),
-          ),
-          Expanded(
-            child: TabBarView(
-              controller: _tab,
-              children: [
-                ListView.builder(
-                  controller: scroll,
-                  itemCount: articulosFiltrados.length,
-                  itemBuilder: (c, i) => ListTile(
-                    leading: const Icon(Icons.inventory_2, color: Colors.amber),
-                    title: Text(articulosFiltrados[i]),
-                    onTap: () {
-                      widget.onAnadir(articulosFiltrados[i], false);
-                      Navigator.pop(c);
-                    },
-                  ),
-                ),
-                ListView.builder(
-                  itemCount: saboresFiltrados.length,
-                  itemBuilder: (c, i) {
-                    final s = saboresFiltrados[i];
-                    return ListTile(
-                      leading: const Icon(Icons.local_fire_department,
-                          color: Colors.indigo),
-                      title: Text(s.nombre),
-                      subtitle: s.marca.isNotEmpty
-                          ? Text('${s.marca}  ·  ${s.formato}',
-                              style: const TextStyle(fontSize: 11))
-                          : null,
-                      onTap: () {
-                        widget.onAnadir(s.nombre, true);
-                        Navigator.pop(c);
-                      },
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }

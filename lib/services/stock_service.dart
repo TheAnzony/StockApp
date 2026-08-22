@@ -19,6 +19,19 @@ class StockService {
   static Future<void> deleteArticulo(DocumentReference ref, String nombre) =>
       ref.update({nombre: FieldValue.delete()});
 
+  static Future<void> updateArticulo({
+    required String nombreViejo,
+    required String nombreNuevo,
+    required int valorActual,
+  }) {
+    final nuevo = nombreNuevo.trim().toUpperCase();
+    if (nuevo == nombreViejo) return Future.value();
+    return _stockRef.update({
+      nombreViejo: FieldValue.delete(),
+      nuevo: valorActual,
+    });
+  }
+
   // ── Sabores ────────────────────────────────────────────────────────────────
 
   static DocumentReference get _saboresRef =>
@@ -36,6 +49,26 @@ class StockService {
 
   static Future<void> deleteSabor(String nombre) =>
       _saboresRef.update({nombre: FieldValue.delete()});
+
+  static Future<void> updateSabor({
+    required String nombreViejo,
+    required String nombreNuevo,
+    required String marca,
+    required String formato,
+    required int cantidad,
+  }) {
+    final nuevo = nombreNuevo.trim();
+    if (nuevo == nombreViejo) {
+      return _saboresRef.update({
+        '$nombreViejo.marca': marca.trim(),
+        '$nombreViejo.formato': formato.trim(),
+      });
+    }
+    return _saboresRef.update({
+      nombreViejo: FieldValue.delete(),
+      nuevo: {'marca': marca.trim(), 'formato': formato.trim(), 'cantidad': cantidad},
+    });
+  }
 
   // ── Logs ───────────────────────────────────────────────────────────────────
 

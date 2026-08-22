@@ -54,18 +54,7 @@ enum RolUsuario {
 
 // Constantes de Articulos
 class ArticuloConstants {
-  static const List<String> itemsRoturas = [
-    'cazoletas',
-    'kalouds',
-    'cachimbas',
-    'bases',
-    'hornillos',
-    'boquilla mangueras',
-    'punzones'
-  ];
-  
   static const String cachimbas = 'cachimbas';
-  static const String mangueras = 'mangueras';
   static const String mastil = 'mastil';
 }
 

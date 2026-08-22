@@ -19,20 +19,6 @@ class _HistorialPedidosScreenState extends State<HistorialPedidosScreen> {
     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
   ];
 
-  static const Map<String, Color> _coloresPrioridad = {
-    'alta':   Color(0xFFFF5252),
-    'media':  Colors.orange,
-    'baja':   Colors.amber,
-    'manual': Colors.blueGrey,
-  };
-
-  static const Map<String, String> _labelPrioridad = {
-    'alta':   'ALTA',
-    'media':  'MEDIA',
-    'baja':   'BAJA',
-    'manual': 'MANUAL',
-  };
-
   String _formatFecha(DateTime dt) =>
       '${dt.day.toString().padLeft(2, '0')}-'
       '${dt.month.toString().padLeft(2, '0')}-'
@@ -237,32 +223,20 @@ class _HistorialPedidosScreenState extends State<HistorialPedidosScreen> {
             style: const TextStyle(fontSize: 12, color: Colors.grey)),
         children: items.map((item) {
           final nombre = item['nombre'] as String? ?? '';
-          final prioridad = item['prioridad'] as String? ?? 'manual';
           final cantidad = (item['cantidad'] as num?)?.toInt() ?? 0;
           final esSabor = item['esSabor'] as bool? ?? false;
-          final color = _coloresPrioridad[prioridad] ?? Colors.blueGrey;
-          final label = _labelPrioridad[prioridad] ?? prioridad.toUpperCase();
 
           return ListTile(
             dense: true,
-            leading: Container(
-              width: 4,
-              height: 36,
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(2),
-              ),
+            leading: Icon(
+              esSabor ? Icons.local_fire_department : Icons.inventory_2,
+              color: esSabor ? Colors.indigo : Colors.amber,
+              size: 20,
             ),
             title: Text(nombre, style: const TextStyle(fontWeight: FontWeight.w600)),
-            subtitle: Row(
-              children: [
-                _chip(label, color),
-                if (esSabor) ...[
-                  const SizedBox(width: 4),
-                  _chip('SABOR', Colors.indigo),
-                ],
-              ],
-            ),
+            subtitle: esSabor
+                ? const Text('SABOR', style: TextStyle(fontSize: 11, color: Colors.indigo))
+                : null,
             trailing: cantidad > 0
                 ? Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -281,16 +255,4 @@ class _HistorialPedidosScreenState extends State<HistorialPedidosScreen> {
       ),
     );
   }
-
-  Widget _chip(String label, Color color) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(5),
-          border: Border.all(color: color, width: 1),
-        ),
-        child: Text(label,
-            style: TextStyle(
-                fontSize: 9, fontWeight: FontWeight.bold, color: color)),
-      );
 }

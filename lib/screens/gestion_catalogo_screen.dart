@@ -96,6 +96,93 @@ class _GestionCatalogoScreenState extends State<GestionCatalogoScreen>
     );
   }
 
+  void _dialogoEditar({
+    required String nombreActual,
+    required bool esSabor,
+    required dynamic valor,
+    required Set<String> otrosNombres,
+  }) {
+    final Map<String, dynamic> saborData =
+        esSabor && valor is Map<String, dynamic> ? valor : const {};
+    final int stockActual = !esSabor ? ((valor as num?)?.toInt() ?? 0) : 0;
+
+    final ctrlNombre = TextEditingController(text: nombreActual);
+    final ctrlMarca = TextEditingController(text: saborData['marca'] as String? ?? '');
+    final ctrlFormato = TextEditingController(text: saborData['formato'] as String? ?? '');
+    final int cantidadActual = (saborData['cantidad'] as num?)?.toInt() ?? 0;
+
+    showDialog(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text(esSabor ? 'Editar Sabor' : 'Editar Producto'),
+        content: esSabor
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: ctrlNombre,
+                    decoration: const InputDecoration(labelText: 'Nombre'),
+                    textCapitalization: TextCapitalization.words,
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: ctrlMarca,
+                    decoration: const InputDecoration(labelText: 'Marca'),
+                    textCapitalization: TextCapitalization.words,
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: ctrlFormato,
+                    decoration:
+                        const InputDecoration(labelText: 'Formato (50gr, 100gr, 200gr...)'),
+                  ),
+                ],
+              )
+            : TextField(
+                controller: ctrlNombre,
+                decoration: const InputDecoration(labelText: 'Nombre'),
+                textCapitalization: TextCapitalization.words,
+              ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(c),
+              child: const Text('CANCELAR')),
+          ElevatedButton(
+            onPressed: () async {
+              final nuevoNombre = ctrlNombre.text.trim();
+              if (nuevoNombre.isEmpty) return;
+              final colisiona = otrosNombres.any((n) =>
+                  n.toLowerCase() ==
+                  (esSabor ? nuevoNombre : nuevoNombre.toUpperCase()).toLowerCase());
+              if (colisiona) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text('Ya existe un ítem llamado "$nuevoNombre"')));
+                return;
+              }
+              if (esSabor) {
+                await StockService.updateSabor(
+                  nombreViejo: nombreActual,
+                  nombreNuevo: ctrlNombre.text,
+                  marca: ctrlMarca.text,
+                  formato: ctrlFormato.text,
+                  cantidad: cantidadActual,
+                );
+              } else {
+                await StockService.updateArticulo(
+                  nombreViejo: nombreActual,
+                  nombreNuevo: ctrlNombre.text,
+                  valorActual: stockActual,
+                );
+              }
+              if (c.mounted) Navigator.pop(c);
+            },
+            child: const Text('GUARDAR'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _dialogoEliminar(
       BuildContext context, String nombre, bool esSabor, DocumentReference ref) {
     showDialog(
@@ -166,10 +253,24 @@ class _GestionCatalogoScreenState extends State<GestionCatalogoScreen>
                 subtitle: subtitulo != null
                     ? Text(subtitulo, style: const TextStyle(fontSize: 12))
                     : null,
-                trailing: IconButton(
-                  icon: const Icon(Icons.delete_sweep, color: Colors.redAccent),
-                  onPressed: () =>
-                      _dialogoEliminar(context, k, esSabor, snap.data!.reference),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.edit, color: Colors.blueGrey),
+                      onPressed: () => _dialogoEditar(
+                        nombreActual: k,
+                        esSabor: esSabor,
+                        valor: data[k],
+                        otrosNombres: keys.where((n) => n != k).toSet(),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_sweep, color: Colors.redAccent),
+                      onPressed: () =>
+                          _dialogoEliminar(context, k, esSabor, snap.data!.reference),
+                    ),
+                  ],
                 ),
               ),
             );

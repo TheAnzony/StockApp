@@ -36,6 +36,10 @@ class _HistorialFiltradoScreenState extends State<HistorialFiltradoScreen> {
     final p = id.split('-');
     return p.length > 1 ? (int.tryParse(p[1]) ?? 0) : 0;
   }
+  int _diaDeId(String id) {
+    final p = id.split('-');
+    return p.length > 2 ? (int.tryParse(p[2]) ?? 0) : 0;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -110,7 +114,7 @@ class _HistorialFiltradoScreenState extends State<HistorialFiltradoScreen> {
               itemBuilder: (context, i) {
                 final mes = mesesOrdenados[i];
                 final dias = porMes[mes]!
-                  ..sort((a, b) => b.id.compareTo(a.id));
+                  ..sort((a, b) => _diaDeId(b.id).compareTo(_diaDeId(a.id)));
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [

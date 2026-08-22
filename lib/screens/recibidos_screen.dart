@@ -4,6 +4,23 @@ import '../models/sabor.dart';
 import '../session.dart';
 import '../services/stock_service.dart';
 
+const String _conceptoNuevo = 'STOCK NUEVO';
+const String _conceptoDevolucion = 'DEVOLUCIÓN PRESTADO';
+
+class _ItemStock {
+  final String nombre;
+  final bool esSabor;
+  final int stock;
+  final String? subtitulo;
+
+  _ItemStock({
+    required this.nombre,
+    required this.esSabor,
+    required this.stock,
+    this.subtitulo,
+  });
+}
+
 class RecibidosScreen extends StatefulWidget {
   const RecibidosScreen({super.key});
   @override
@@ -11,220 +28,290 @@ class RecibidosScreen extends StatefulWidget {
 }
 
 class _RecibidosScreenState extends State<RecibidosScreen> {
-  // Cada item: articulo, cantidad, concepto?, origen?, esSabor
-  final List<Map<String, dynamic>> _lista = [];
+  // Persiste las cantidades y el concepto introducidos entre rebuilds del stream
+  final Map<String, int> _cantidades = {};
+  final Map<String, String> _conceptos = {};
+  final Map<String, TextEditingController> _origenCtrls = {};
+  String _busqueda = '';
 
-  // ── Selector de artículo ──────────────────────────────────────────────────
+  String _conceptoDe(String nombre) => _conceptos[nombre] ?? _conceptoNuevo;
 
-  void _abrirSelectorArticulo(List<String> catalogo) {
-    String? art;
-    final cantCtrl = TextEditingController(text: '1');
-    final origenCtrl = TextEditingController();
-    String concepto = 'STOCK NUEVO';
+  TextEditingController _origenCtrl(String nombre) =>
+      _origenCtrls.putIfAbsent(nombre, () => TextEditingController());
 
-    showDialog(
-      context: context,
-      builder: (c) => StatefulBuilder(
-        builder: (context, setSt) => AlertDialog(
-          title: const Text('Añadir Artículo'),
-          content: SingleChildScrollView(
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              DropdownButtonFormField<String>(
-                decoration: const InputDecoration(labelText: 'Artículo'),
-                items: catalogo
-                    .map((e) => DropdownMenuItem(value: e, child: Text(e.toUpperCase())))
-                    .toList(),
-                onChanged: (v) => art = v,
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: cantCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                    labelText: 'Cantidad', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 14),
-              DropdownButtonFormField<String>(
-                initialValue: concepto,
-                decoration: const InputDecoration(labelText: 'Concepto'),
-                items: ['STOCK NUEVO', 'DEVOLUCIÓN PRESTADO']
-                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                    .toList(),
-                onChanged: (v) => setSt(() => concepto = v!),
-              ),
-              if (concepto == 'DEVOLUCIÓN PRESTADO') ...[
-                const SizedBox(height: 14),
-                TextField(
-                  controller: origenCtrl,
-                  decoration: const InputDecoration(labelText: '¿De dónde viene?'),
-                  textCapitalization: TextCapitalization.characters,
-                ),
-              ],
-            ]),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(c), child: const Text('CANCELAR')),
-            ElevatedButton(
-              onPressed: () {
-                if (art != null) {
-                  setState(() => _lista.add({
-                        'articulo': art,
-                        'cantidad': int.tryParse(cantCtrl.text) ?? 1,
-                        'concepto': concepto,
-                        'origen': concepto == 'DEVOLUCIÓN PRESTADO'
-                            ? origenCtrl.text
-                            : null,
-                        'esSabor': false,
-                      }));
-                  Navigator.pop(c);
-                }
-              },
-              child: const Text('AÑADIR'),
-            ),
-          ],
-        ),
-      ),
-    );
+  @override
+  void dispose() {
+    for (final c in _origenCtrls.values) {
+      c.dispose();
+    }
+    super.dispose();
   }
 
-  // ── Selector de sabor ─────────────────────────────────────────────────────
+  List<_ItemStock> _construirArticulos(Map<String, dynamic> art) {
+    final lista = art.entries
+        .map((entry) => _ItemStock(
+              nombre: entry.key,
+              esSabor: false,
+              stock: (entry.value as num?)?.toInt() ?? 0,
+            ))
+        .toList();
+    lista.sort((a, b) => a.nombre.toLowerCase().compareTo(b.nombre.toLowerCase()));
+    return lista;
+  }
 
-  Future<void> _abrirSelectorSabor() async {
-    final snap = await StockService.saboresRef().get();
-    if (!snap.exists || !mounted) return;
+  List<_ItemStock> _construirSabores(Map<String, dynamic> sab) {
+    final lista = sab.entries.map((entry) {
+      final s = Sabor.fromEntry(entry.key, entry.value);
+      return _ItemStock(
+        nombre: s.nombre,
+        esSabor: true,
+        stock: s.cantidad,
+        subtitulo: s.marca.isNotEmpty ? '${s.marca} · ${s.formato}' : null,
+      );
+    }).toList();
+    lista.sort((a, b) => a.nombre.toLowerCase().compareTo(b.nombre.toLowerCase()));
+    return lista;
+  }
 
-    final data = snap.data() as Map<String, dynamic>;
-    final sabores = data.entries
-        .map((e) => Sabor.fromEntry(e.key, e.value))
-        .toList()
-      ..sort((a, b) => a.nombre.compareTo(b.nombre));
-
-    if (!mounted) return;
-
-    Sabor? sabor;
-    final cantCtrl = TextEditingController(text: '1');
-
-    showDialog(
-      context: context,
-      builder: (c) => StatefulBuilder(
-        builder: (context, setSt) => AlertDialog(
-          title: const Text('Añadir Sabor'),
-          contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
-          content: Column(mainAxisSize: MainAxisSize.min, children: [
-            DropdownButtonFormField<Sabor>(
-              decoration: const InputDecoration(labelText: 'Sabor'),
-              isExpanded: true,
-              // Texto compacto al seleccionar: "Nombre · Marca · Formato"
-              selectedItemBuilder: (context) => sabores
-                  .map((s) => Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          '${s.nombre}  ·  ${s.marca}  ·  ${s.formato}',
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ))
-                  .toList(),
-              items: sabores
-                  .map((s) => DropdownMenuItem(
-                        value: s,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(s.nombre,
-                                style: const TextStyle(fontWeight: FontWeight.bold)),
-                            if (s.marca.isNotEmpty)
-                              Text('${s.marca}  ·  ${s.formato}',
-                                  style: const TextStyle(
-                                      fontSize: 11, color: Colors.grey)),
-                          ],
-                        ),
-                      ))
-                  .toList(),
-              onChanged: (v) => setSt(() => sabor = v),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: cantCtrl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                  labelText: 'Cantidad recibida', border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 4),
-          ]),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(c), child: const Text('CANCELAR')),
-            ElevatedButton(
-              onPressed: () {
-                if (sabor != null) {
-                  setState(() => _lista.add({
-                        'articulo': sabor!.nombre,
-                        'cantidad': int.tryParse(cantCtrl.text) ?? 1,
-                        'formato': sabor!.formato,
-                        'marca': sabor!.marca,
-                        'esSabor': true,
-                      }));
-                  Navigator.pop(c);
-                }
-              },
-              child: const Text('AÑADIR'),
-            ),
-          ],
-        ),
-      ),
-    );
+  String _conceptoTexto(_ItemStock item) {
+    final concepto = _conceptoDe(item.nombre);
+    if (concepto == _conceptoDevolucion) {
+      final origen = _origenCtrl(item.nombre).text.trim();
+      return origen.isEmpty ? concepto : '$concepto ($origen)';
+    }
+    return concepto;
   }
 
   // ── Confirmar recepción ───────────────────────────────────────────────────
 
-  Future<void> _confirmar() async {
-    final articulos = _lista.where((p) => p['esSabor'] != true).toList();
-    final sabores   = _lista.where((p) => p['esSabor'] == true).toList();
+  Future<void> _confirmarRecepcion(List<_ItemStock> todos) async {
+    final items = todos.where((i) => (_cantidades[i.nombre] ?? 0) > 0).toList();
 
-    // Artículos: actualizar stock + log
-    if (articulos.isNotEmpty) {
-      final Map<String, dynamic> updates = {};
-      final List<Map<String, dynamic>> logs = [];
-      for (final p in articulos) {
-        final String art = p['articulo'];
-        final int cant = p['cantidad'];
-        updates[art] = FieldValue.increment(cant);
-        String conceptoFinal = p['concepto'];
-        if (p['origen'] != null && p['origen'].toString().isNotEmpty) {
-          conceptoFinal += ' (${p['origen']})';
-        }
-        logs.add({
-          'articulo': art.toUpperCase(),
-          'cantidad': cant,
-          'fecha': DateTime.now(),
-          'motivo': 'RECIBIDO',
-          'concepto': conceptoFinal,
-          'operador': usuarioActual?['nombre'] ?? '?',
-        });
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Resumen de recepción'),
+        content: SizedBox(
+          width: 380,
+          child: items.isEmpty
+              ? const Text('No hay artículos ni sabores con cantidad mayor a 0.')
+              : ConstrainedBox(
+                  constraints: BoxConstraints(
+                      maxHeight: MediaQuery.of(context).size.height * 0.5),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: items.length,
+                    separatorBuilder: (_, _) =>
+                        const Divider(height: 1, color: Colors.white12),
+                    itemBuilder: (context, i) {
+                      final item = items[i];
+                      final nombre =
+                          item.esSabor ? item.nombre : item.nombre.toUpperCase();
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(nombre,
+                                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                                ),
+                                Text('+${_cantidades[item.nombre]}',
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold, color: Colors.green)),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            Text(_conceptoTexto(item),
+                                style: const TextStyle(fontSize: 11, color: Colors.cyan)),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('VOLVER')),
+          if (items.isNotEmpty)
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2E7D32)),
+              onPressed: () => Navigator.pop(c, true),
+              child: const Text('CONFIRMAR',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+
+    final Map<String, dynamic> stockUpdates = {};
+    final Map<String, dynamic> saborUpdates = {};
+    final List<Map<String, dynamic>> logs = [];
+
+    for (final item in items) {
+      final cant = _cantidades[item.nombre]!;
+      final conceptoFinal = _conceptoTexto(item);
+      if (item.esSabor) {
+        saborUpdates['${item.nombre}.cantidad'] = FieldValue.increment(cant);
+      } else {
+        stockUpdates[item.nombre] = FieldValue.increment(cant);
       }
-      await StockService.articulosRef().update(updates);
-      await StockService.agregarMovimientos(logs);
+      logs.add({
+        'articulo': item.esSabor ? item.nombre : item.nombre.toUpperCase(),
+        'cantidad': cant,
+        'fecha': DateTime.now(),
+        'motivo': 'RECIBIDO',
+        'concepto': conceptoFinal,
+        'operador': usuarioActual?['nombre'] ?? '?',
+      });
     }
 
-    // Sabores: incrementar .cantidad con dot notation
-    if (sabores.isNotEmpty) {
-      final Map<String, dynamic> saborUpdates = {};
-      for (final p in sabores) {
-        saborUpdates['${p['articulo']}.cantidad'] =
-            FieldValue.increment(p['cantidad'] as int);
-      }
-      await StockService.saboresRef().update(saborUpdates);
-    }
+    if (stockUpdates.isNotEmpty) await StockService.articulosRef().update(stockUpdates);
+    if (saborUpdates.isNotEmpty) await StockService.saboresRef().update(saborUpdates);
+    if (logs.isNotEmpty) await StockService.agregarMovimientos(logs);
 
     if (mounted) {
-      Navigator.pop(context);
+      setState(() {
+        _cantidades.clear();
+        _conceptos.clear();
+        for (final c in _origenCtrls.values) {
+          c.clear();
+        }
+      });
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('✅ Entrada confirmada')));
     }
   }
 
-  // ── Build ─────────────────────────────────────────────────────────────────
+  // ── UI ────────────────────────────────────────────────────────────────────
+
+  Widget _buildHeader(String label) => Padding(
+        padding: const EdgeInsets.fromLTRB(2, 16, 2, 8),
+        child: Row(
+          children: [
+            Container(
+              width: 4,
+              height: 16,
+              decoration: BoxDecoration(
+                color: Colors.green,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(label,
+                style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: Colors.green,
+                    letterSpacing: 1.5)),
+          ],
+        ),
+      );
+
+  Widget _buildCard(_ItemStock item) {
+    final bool activo = (_cantidades[item.nombre] ?? 0) > 0;
+    final String concepto = _conceptoDe(item.nombre);
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(item.esSabor ? item.nombre : item.nombre.toUpperCase(),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      if (item.subtitulo != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(item.subtitulo!,
+                              style: const TextStyle(fontSize: 11, color: Colors.white54)),
+                        ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  margin: const EdgeInsets.only(right: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white10,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text('STOCK', style: TextStyle(fontSize: 9, color: Colors.white38)),
+                      Text('${item.stock}',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    ],
+                  ),
+                ),
+                SizedBox(
+                  width: 62,
+                  child: TextFormField(
+                    key: Key('rec_${item.nombre}'),
+                    initialValue: '${_cantidades[item.nombre] ?? 0}',
+                    keyboardType: TextInputType.number,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    decoration:
+                        const InputDecoration(isDense: true, border: OutlineInputBorder()),
+                    onChanged: (v) => setState(() {
+                      _cantidades[item.nombre] = int.tryParse(v) ?? 0;
+                    }),
+                  ),
+                ),
+              ],
+            ),
+            if (activo) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: ChoiceChip(
+                      label: const Text('STOCK NUEVO', style: TextStyle(fontSize: 11)),
+                      selected: concepto == _conceptoNuevo,
+                      onSelected: (_) =>
+                          setState(() => _conceptos[item.nombre] = _conceptoNuevo),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ChoiceChip(
+                      label: const Text('DEVOLUCIÓN', style: TextStyle(fontSize: 11)),
+                      selected: concepto == _conceptoDevolucion,
+                      onSelected: (_) =>
+                          setState(() => _conceptos[item.nombre] = _conceptoDevolucion),
+                    ),
+                  ),
+                ],
+              ),
+              if (concepto == _conceptoDevolucion) ...[
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _origenCtrl(item.nombre),
+                  decoration: const InputDecoration(
+                    labelText: '¿De dónde viene?',
+                    isDense: true,
+                    border: OutlineInputBorder(),
+                  ),
+                  textCapitalization: TextCapitalization.characters,
+                ),
+              ],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -235,108 +322,97 @@ class _RecibidosScreenState extends State<RecibidosScreen> {
       appBar: AppBar(title: const Text('RECIBIR MATERIAL')),
       body: StreamBuilder<DocumentSnapshot>(
         stream: StockService.articulosStream(),
-        builder: (context, snap) {
-          if (!snap.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final catalogo =
-              (snap.data!.data() as Map).keys.whereType<String>().toList()..sort();
+        builder: (context, snapArt) {
+          return StreamBuilder<DocumentSnapshot>(
+            stream: StockService.saboresStream(),
+            builder: (context, snapSab) {
+              if (!snapArt.hasData || !snapSab.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-          Widget bodyContent = Column(children: [
-            Expanded(
-              child: _lista.isEmpty
-                  ? const Center(child: Text('Lista vacía'))
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(10),
-                      itemCount: _lista.length,
-                      itemBuilder: (context, index) {
-                        final p = _lista[index];
-                        final esSabor = p['esSabor'] == true;
-                        final titulo = esSabor
-                            ? '${p['articulo']}  (x${p['cantidad']})'
-                            : '${p['articulo'].toString().toUpperCase()}  (x${p['cantidad']})';
-                        final subtitulo = esSabor
-                            ? '${p['marca'] ?? ''}  ·  ${p['formato'] ?? ''}'
-                            : '${p['concepto']}${p['origen'] != null ? '  [${p['origen']}]' : ''}';
-                        final color = esSabor
-                            ? Colors.indigo
-                            : (p['origen'] != null ? Colors.cyan : Colors.green);
+              final articulosCache = snapArt.data!.exists
+                  ? snapArt.data!.data() as Map<String, dynamic>
+                  : <String, dynamic>{};
+              final saboresCache = snapSab.data!.exists
+                  ? snapSab.data!.data() as Map<String, dynamic>
+                  : <String, dynamic>{};
 
-                        return Card(
-                          child: ListTile(
-                            leading: Icon(
-                              esSabor
-                                  ? Icons.local_fire_department
-                                  : Icons.inventory_2,
-                              color: color,
-                            ),
-                            title: Text(titulo,
-                                style: const TextStyle(fontWeight: FontWeight.bold)),
-                            subtitle: Text(subtitulo,
-                                style: TextStyle(color: color, fontSize: 12)),
-                            trailing: IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.redAccent),
-                              onPressed: () =>
-                                  setState(() => _lista.removeAt(index)),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: const BoxDecoration(
-                color: Color(0xFF1E1E1E),
-                border: Border(top: BorderSide(color: Colors.white10)),
-              ),
-              child: Column(children: [
-                Row(children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                          minimumSize: const Size(0, 48),
-                          backgroundColor: const Color(0xFF1976D2)),
-                      onPressed: () => _abrirSelectorArticulo(catalogo),
-                      icon: const Icon(Icons.inventory_2, size: 18),
-                      label: const Text('ARTÍCULO',
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold, color: Colors.white)),
-                    ),
+              final articulos = _construirArticulos(articulosCache);
+              final sabores = _construirSabores(saboresCache);
+              final todos = [...articulos, ...sabores];
+
+              bool coincide(_ItemStock i) => _busqueda.isEmpty ||
+                  i.nombre.toLowerCase().contains(_busqueda.toLowerCase());
+              final articulosFiltrados = articulos.where(coincide).toList();
+              final saboresFiltrados = sabores.where(coincide).toList();
+
+              Widget listView = ListView(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                children: [
+                  if (articulosFiltrados.isNotEmpty) ...[
+                    _buildHeader('ARTÍCULOS'),
+                    ...articulosFiltrados.map(_buildCard),
+                  ],
+                  if (saboresFiltrados.isNotEmpty) ...[
+                    _buildHeader('SABORES'),
+                    ...saboresFiltrados.map(_buildCard),
+                  ],
+                ],
+              );
+
+              final Widget lista = dt
+                  ? Align(
+                      alignment: Alignment.topCenter,
+                      child: SizedBox(width: sw * 0.6, child: listView))
+                  : listView;
+
+              Widget buscador = Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                child: TextField(
+                  decoration: const InputDecoration(
+                    hintText: 'Buscar artículo o sabor...',
+                    prefixIcon: Icon(Icons.search),
+                    isDense: true,
+                    border: OutlineInputBorder(),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                          minimumSize: const Size(0, 48),
-                          backgroundColor: Colors.indigo),
-                      onPressed: _abrirSelectorSabor,
-                      icon: const Icon(Icons.local_fire_department, size: 18),
-                      label: const Text('SABOR',
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold, color: Colors.white)),
-                    ),
-                  ),
-                ]),
-                const SizedBox(height: 10),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(50),
-                      backgroundColor: const Color(0xFF2E7D32)),
-                  onPressed: _lista.isEmpty ? null : _confirmar,
-                  child: const Text('CONFIRMAR RECEPCIÓN',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold, color: Colors.white)),
+                  onChanged: (v) => setState(() => _busqueda = v),
                 ),
-              ]),
-            ),
-          ]);
+              );
 
-          return dt
-              ? Align(
-                  alignment: Alignment.topCenter,
-                  child: SizedBox(width: sw * 0.6, child: bodyContent))
-              : bodyContent;
+              return Column(
+                children: [
+                  dt
+                      ? Align(
+                          alignment: Alignment.topCenter,
+                          child: SizedBox(width: sw * 0.6, child: buscador))
+                      : buscador,
+                  Expanded(child: lista),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF1A1A1A),
+                      border: Border(top: BorderSide(color: Colors.white10)),
+                    ),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton.icon(
+                        onPressed: () => _confirmarRecepcion(todos),
+                        style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2E7D32)),
+                        icon: const Icon(Icons.check, color: Colors.white),
+                        label: const Text('CONFIRMAR RECEPCIÓN',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.2)),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          );
         },
       ),
     );
