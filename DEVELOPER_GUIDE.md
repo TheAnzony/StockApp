@@ -212,53 +212,12 @@ dt ? Align(
 
 ---
 
-## Flavors Android
-
-Configurados en `android/app/build.gradle.kts`:
-
-```kotlin
-flavorDimensions += "env"
-productFlavors {
-    create("prod") {
-        dimension = "env"
-        applicationId = "com.example.proyecto_stockapp"
-    }
-    create("beta") {
-        dimension = "env"
-        applicationId = "stockapp.beta"
-    }
-}
-```
-
-En `main.dart`, la selección de Firebase Options se hace mediante:
-
-```dart
-const _flavor = String.fromEnvironment('FLAVOR', defaultValue: 'prod');
-
-final options = _flavor == 'beta'
-    ? BetaFirebaseOptions.currentPlatform
-    : DefaultFirebaseOptions.currentPlatform;
-```
-
----
-
 ## Scripts de utilidad
 
 ### `update_version.js`
 Actualiza `ajustes/configuracion.min_version` en Firestore de producción. Se llama automáticamente desde `deploy.sh`.
 ```bash
 node update_version.js 1.0.5
-```
-
-### `copy_db_to_beta.js`
-Copia las colecciones `articulos`, `trabajadores`, `ajustes` y `logs_diarios` del proyecto de producción al proyecto beta. Requiere:
-- `serviceAccount.json` — service account de producción
-- `serviceAccount_beta.json` — service account del proyecto beta
-
-Ambos ficheros deben obtenerse desde **Firebase Console → Configuración del proyecto → Cuentas de servicio → Generar nueva clave privada**.
-
-```bash
-node copy_db_to_beta.js
 ```
 
 ### `migrate_mezclas.js`

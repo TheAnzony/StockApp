@@ -23,24 +23,11 @@ android {
     }
 
     defaultConfig {
+        applicationId = "com.example.proyecto_stockapp"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-    }
-
-    flavorDimensions += "env"
-    productFlavors {
-        create("prod") {
-            dimension = "env"
-            applicationId = "com.example.proyecto_stockapp"
-            resValue("string", "app_name", "StockApp")
-        }
-        create("beta") {
-            dimension = "env"
-            applicationId = "stockapp.beta"
-            resValue("string", "app_name", "StockApp Beta")
-        }
     }
 
     buildTypes {

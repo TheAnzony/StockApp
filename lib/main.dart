@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
-import 'firebase_options_beta.dart';
 import 'screens/login_screen.dart';
 import 'screens/menu_principal.dart';
 import 'screens/update_required_screen.dart';
@@ -11,14 +10,9 @@ import 'services/auth_service.dart';
 import 'services/session_service.dart';
 import 'session.dart';
 
-const _flavor = String.fromEnvironment('FLAVOR', defaultValue: 'prod');
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final options = _flavor == 'beta'
-      ? BetaFirebaseOptions.currentPlatform
-      : DefaultFirebaseOptions.currentPlatform;
-  await Firebase.initializeApp(options: options);
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await AuthService.configurarPersistencia();
   runApp(const MyApp());
 }
